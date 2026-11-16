@@ -19,7 +19,7 @@ import os
 import sys
 from pathlib import Path
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))

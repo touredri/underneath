@@ -37,7 +37,7 @@ In a randomized controlled trial, Anthropic found that developers learning a new
 - **Links you can trust.** `cache.get(k)` links to `ReportCache.get` when the code says `cache: ReportCache`; `rows.get(k)` on a dict links to nothing. Classes, `extends` and `super()` are followed; SQL written in Python or JS strings is read as SQL.
 - **Likely bugs surface by themselves.** Twelve rules are marked `risk`, each tied to the fundamental that explains it: `= NULL`, `NOT IN (SELECT …)`, an `UPDATE` without `WHERE`, a `WHERE` that undoes a `LEFT JOIN`; an effect without dependencies that sets state, an async effect, `key={index}`; `forEach(async …)`, an empty `catch`; an `except` that only passes, a query in a loop (N+1), a mutable default argument. They are always drawn, the agent must say whether each one is real or guarded, and the evaluation set counts false alarms as failures.
 - **It remembers what you know.** A local registry counts the concepts you have seen. New ones get a thick border; familiar ones fade out. `/underneath gaps` lists the ones you never marked as known.
-- **Measured.** 48 diffs, half of them real commits of open-source projects, check that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
+- **Measured.** 76 diffs, 46 of them real commits of open-source projects, check that no concept is invented, no false link is drawn and no likely bug is raised for nothing (see [Evaluation](#evaluation)).
 - **Local.** No network, no telemetry. `.underneath/` ignores itself in git.
 
 ![The fundamental panel for a SQL change, dark mode](docs/map-sql-dark.png)
@@ -170,16 +170,18 @@ On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the pr
 - **edge recall** and **false links**: expected calls found, and edges that should not be there;
 - **wrong context**: an unchanged function drawn when it should not be (a utility used everywhere), or missing when it should be (a caller).
 
-48 cases: 24 written for the purpose (the examples, a few changes per stack, and traps such as a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` used in every page) and 24 real commits of [zustand](https://github.com/pmndrs/zustand), [httpx](https://github.com/encode/httpx), [postgres_dba](https://github.com/NikolayS/postgres_dba) and [jaffle-shop-classic](https://github.com/dbt-labs/jaffle-shop-classic), annotated by reading the diff before running the tool (licenses in `evals/third_party/`).
+76 cases. 30 written for the purpose: the examples, a few changes per stack, each likely bug next to its safe version, and traps such as a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` used in every page. 46 real commits of [zustand](https://github.com/pmndrs/zustand), [httpx](https://github.com/encode/httpx), [postgres_dba](https://github.com/NikolayS/postgres_dba), [jaffle-shop-classic](https://github.com/dbt-labs/jaffle-shop-classic), [bulletproof-react](https://github.com/alan2207/bulletproof-react), [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) and [djangoproject.com](https://github.com/django/djangoproject.com), annotated by reading the diff before running the tool (licenses in `evals/third_party/`).
 
-| On the same 48 cases | v0.2.1 | v0.3.0 |
+| On the same 76 cases | v0.3.0 | v0.4.0 |
 |---|---|---|
-| Concept precision | 98.9% (1 invented) | 100% (0 invented) |
-| Concept recall | 64.7% (39.3% on the real commits) | 100% |
-| Edge recall | 81.5% | 100% |
-| False links | 4 | 0 |
+| Concept precision | 99.0% (2 invented) | 100% (0 invented) |
+| Concept recall | 94.5% | 100% |
+| Edge recall | 95.2% | 98.6% |
+| False links | 3 | 0 |
+| Likely-bug rules | 2 | 12 |
+| Likely bugs found / false alarms | | 100% / 0 |
 
-The real commits found most of what v0.3.0 fixes (SQL with `WITH` produced nothing, wrong links through `super()` and generators), so 100% here means "fixed what this set exposed", not "done": the set keeps growing. To add a commit: `python3 evals/tools/import_case.py <repo> <sha> <name>`, fill `expected.json` from the diff, then `python3 evals/run.py --show <name>` prints what the tool sees.
+The two links still missed need Django's runtime (`self.model`, a loop over `Model.__subclasses__()`). Each version is measured on cases that exposed its predecessor's mistakes, so read 100% as "fixed what this set exposed": the set keeps growing. To add a commit: `python3 evals/tools/import_case.py <repo> <sha> <name>`, fill `expected.json` from the diff, then `python3 evals/run.py --show <name>` prints what the tool sees.
 
 ## Add a stack
 

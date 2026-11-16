@@ -2,6 +2,25 @@
 
 All notable changes to underneath. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-11-16
+
+### Added
+
+- Ten likely-bug rules, each tied to a fundamental and checked by the agent in the card: `= NULL` in a condition, `NOT IN (SELECT ...)`, `UPDATE`/`DELETE` without `WHERE`; an effect without dependency array that sets state, an async effect, `key={index}` from the map callback; `forEach(async ...)`, an empty `catch`; an `except` that only passes, a database query in a loop body (N+1). Twelve in all with the mutable default and the `WHERE` that undoes a `LEFT JOIN`.
+- `detect: tree <flag>` in stack files: structural patterns read from the syntax tree (a missing argument, an empty block, a call inside a loop body), for what a regex cannot see reliably.
+- Evaluation: likely-bug recall and false alarms (thresholds: at least 90 %, zero false alarms), six cases with each pattern and its safe version, and 22 more real commits (bulletproof-react, full-stack-fastapi-template, djangoproject.com): 76 cases in all.
+- `stop_hook_timeout` in `.underneath/config.json` (20 s by default).
+
+### Changed
+
+- The Stop hook follows the code, not the tool: a file rewritten through Bash asks for the card; a turn that only read (`git status`) stays quiet. Past the timeout it skips the card and says so once a day. It falls back to `python` where `python3` does not exist.
+- Calls are classified by their receiver. A bare call (`render()`) links to a function or a class, never to a method; a call on a local variable or a parameter of unknown type, or on a chain, links nothing by name; a fluent chain of the class's own calls (`self.filter(...).with_latest()`) stays in the class; `Model.objects.m()` goes through the type the class declares for `objects`.
+
+### Fixed
+
+- Django test files (`tests.py`, `tests_*.py`, `conftest.py`) were drawn as code.
+- Three kinds of wrong links seen in real code: Django's `render()` to a widget's `render` method, a local `search = partial(...)` to a `search` method, `subscription.unsubscribe()` to another class's `unsubscribe`.
+
 ## [0.3.0] - 2026-11-16
 
 ### Added
@@ -72,6 +91,7 @@ All notable changes to underneath. The format follows [Keep a Changelog](https:/
 
 - First release: `extract`, `render`, `deeper`, `known`. A 5-line card and an HTML map of the functions an agent changed, how they connect, the concepts they use and the fundamental underneath, for React/TypeScript/JavaScript, Python and SQL.
 
+[0.4.0]: https://github.com/touredri/underneath/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/touredri/underneath/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/touredri/underneath/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/touredri/underneath/compare/v0.1.0...v0.2.0

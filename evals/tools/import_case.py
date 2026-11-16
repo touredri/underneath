@@ -18,6 +18,7 @@ Nothing from the repository is executed: files are only read.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
@@ -29,6 +30,11 @@ from diffscope import _skip  # noqa: E402
 from graph import _imports, _suffix_index  # noqa: E402
 
 MAX_IMPORTERS = 6
+# Key-shaped strings are redacted on import, even public test keys: a case must never republish one.
+SECRET = re.compile(
+    r"\b((?:sk|pk|rk)_(?:test|live)_)[A-Za-z0-9]{10,}|\bAKIA[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{30,}\b"
+    r"|\bxox[baprs]-[A-Za-z0-9-]{10,}|\bAIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"
+)
 MAX_FILE = 150_000
 
 
@@ -71,6 +77,7 @@ def main(argv: list[str]) -> int:
     keep |= set(importers)
 
     case = ROOT / "evals" / "cases" / name
+    redacted = 0
     for side, rev in (("before", parent), ("after", sha)):
         for rel in sorted(keep):
             text = show(repo, rev, rel)
@@ -78,6 +85,8 @@ def main(argv: list[str]) -> int:
                 continue
             out = case / side / rel
             out.parent.mkdir(parents=True, exist_ok=True)
+            text, hits = SECRET.subn(lambda m: (m.group(1) or "") + "REDACTED", text)
+            redacted += hits
             out.write_text(text, encoding="utf8")
 
     url = git(repo, "remote", "get-url", "origin").strip()
@@ -86,7 +95,8 @@ def main(argv: list[str]) -> int:
     (case / "SOURCE.md").write_text(
         f"# Source\n\n- Repository: {url}\n- Commit: {sha}\n- Subject: {subject}\n"
         f"- License: see `{license_file or 'the repository'}` in {url} (copied in evals/third_party/).\n"
-        f"- Files: the {len(changed)} changed file(s) and {len(keep) - len(changed)} neighbour(s), unmodified.\n",
+        f"- Files: the {len(changed)} changed file(s) and {len(keep) - len(changed)} neighbour(s), unmodified"
+        + (f" except {redacted} key-shaped string(s) replaced by REDACTED" if redacted else "") + ".\n",
         encoding="utf8",
     )
     expected = case / "expected.json"

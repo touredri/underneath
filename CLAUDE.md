@@ -62,15 +62,16 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.3.0 (2026-11-16), see CHANGELOG.md. Classes as nodes, typed receivers, SQL in strings, history and `log`, one tree-sitter query per file (parse 1.7x faster). 18 tests and 48 eval cases green: 100 % precision, recall and edge recall, 0 false links (v0.2.1 on the same set: 98.9 %, 64.7 %, 81.5 %, 4). Published at https://github.com/touredri/underneath: tag and release v0.3.0, CI green (Ubuntu 3.10/3.13, macOS 3.13), installed plugin updated and checked in a real session (class node, typed call, SQL string linked to its tables).
+v0.4.0 (2026-11-16), see CHANGELOG.md. Twelve likely-bug rules (`detect: tree <flag>` for structural ones), calls classified by receiver (bare, self, module, local, chain, fluent), Django tests and managers, Stop hook that follows the code with a timeout. 19 tests and 76 eval cases (46 real commits): 100 % precision and recall, 98.6 % edge recall, 0 false links, 0 false alarms. v0.3.0 is published; 0.4.0 is committed locally and waits for the maintainer's go to push and release.
 
-Known limits: types only when stated; nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL; regex-based concept rules.
+Known limits: types only when stated; likely-bug rules see one function at a time (a loop that calls a helper which queries is not N+1 to them); nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL.
 
 ## Next steps (in order)
 
-1. Grow the real-commit eval set (more repos, React apps, FastAPI/Django with SQL in strings) with evals/tools/import_case.py; keep expectations written from the diff.
-2. v0.4: optional Graphify `graph.json` for callers outside the scan.
-3. v0.5: more stacks (Vue, Django, Go).
+1. Push 0.4.0, tag, GitHub release, CI, `/plugin update`.
+2. Grow the real-commit eval set (more repos, React apps, FastAPI/Django with SQL in strings) with evals/tools/import_case.py; keep expectations written from the diff.
+3. v0.5: optional Graphify `graph.json` for callers outside the scan.
+4. v0.6: more stacks (Vue, Django, Go).
 
 ## Conventions
 
