@@ -1,0 +1,56 @@
+{
+  "about": "httpx 6d852d3: new BaseClient._set_timeout fills a missing timeout extension; Client.send and AsyncClient.send call it before building auth",
+  "concepts": {
+    "expected": [
+      "py.exceptions",
+      "py.asyncAwait"
+    ],
+    "allowed": [
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Client.send",
+        "BaseClient._set_timeout",
+        "calls"
+      ],
+      [
+        "Client.send",
+        "BaseClient._build_request_auth",
+        "calls"
+      ],
+      [
+        "Client.send",
+        "Client._send_handling_auth",
+        "calls"
+      ],
+      [
+        "AsyncClient.send",
+        "BaseClient._set_timeout",
+        "calls"
+      ],
+      [
+        "AsyncClient.send",
+        "BaseClient._build_request_auth",
+        "calls"
+      ],
+      [
+        "AsyncClient.send",
+        "AsyncClient._send_handling_auth",
+        "calls"
+      ]
+    ],
+    "forbidden": [
+      [
+        "Client._send_handling_auth",
+        "Client.send",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 8
+  }
+}

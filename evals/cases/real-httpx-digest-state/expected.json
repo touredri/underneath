@@ -1,0 +1,49 @@
+{
+  "about": "httpx 8327e13: DigestAuth remembers the last challenge and counts nonces, so later requests send the Authorization header up front",
+  "concepts": {
+    "expected": [
+      "py.generator",
+      "py.closure"
+    ],
+    "allowed": [
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "DigestAuth.auth_flow",
+        "DigestAuth._build_auth_header",
+        "calls"
+      ],
+      [
+        "DigestAuth.auth_flow",
+        "DigestAuth._parse_challenge",
+        "calls"
+      ],
+      [
+        "DigestAuth._build_auth_header",
+        "DigestAuth._get_client_nonce",
+        "calls"
+      ],
+      [
+        "DigestAuth._build_auth_header",
+        "DigestAuth._resolve_qop",
+        "calls"
+      ],
+      [
+        "DigestAuth._build_auth_header",
+        "DigestAuth._get_header_value",
+        "calls"
+      ],
+      [
+        "DigestAuth.__init__",
+        "to_bytes",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 8
+  }
+}

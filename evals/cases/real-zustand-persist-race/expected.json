@@ -1,0 +1,21 @@
+{
+  "about": "zustand d0cb549: persist middleware counts hydration versions so a stale promise chain from an older rehydrate() returns early",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "persistImpl",
+        "createJSONStorage",
+        "calls"
+      ],
+      [
+        "persistImpl",
+        "toThenable",
+        "calls"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "about": "httpx 59914c7: new NetRCAuth class (generator auth flow adding Basic credentials from a netrc file) replaces the client's implicit NetRCInfo lookup, which is deleted",
+  "concepts": {
+    "expected": [
+      "py.generator",
+      "py.inheritance"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "NetRCAuth.auth_flow",
+        "NetRCAuth._build_auth_header",
+        "calls"
+      ],
+      [
+        "NetRCAuth._build_auth_header",
+        "to_bytes",
+        "calls"
+      ],
+      [
+        "BaseClient.__init__",
+        "BaseClient._enforce_trailing_slash",
+        "calls"
+      ],
+      [
+        "BaseClient.__init__",
+        "BaseClient._build_auth",
+        "calls"
+      ],
+      [
+        "BaseClient._build_request_auth",
+        "BaseClient._build_auth",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

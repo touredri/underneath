@@ -1,0 +1,14 @@
+{
+  "about": "jaffle-shop-classic c112cea: dbt customers and orders models switch to table aliases, explicit ON joins and GROUP BY column names (instead of GROUP BY 1) for SQL Server",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.aggregation",
+      "sql.outerJoin"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

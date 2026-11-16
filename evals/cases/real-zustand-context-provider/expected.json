@@ -1,0 +1,15 @@
+{
+  "about": "zustand 611551c: new createContext() returning a Provider that keeps the store in a ref and a useStore hook that reads it with useContext",
+  "concepts": {
+    "expected": [
+      "react.useRef",
+      "react.useContext"
+    ],
+    "allowed": [
+      "react.customHook"
+    ]
+  },
+  "edges": {
+    "expected": []
+  }
+}

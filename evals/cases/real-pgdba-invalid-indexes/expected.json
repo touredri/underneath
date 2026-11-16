@@ -1,0 +1,14 @@
+{
+  "about": "postgres_dba 70b896e: invalid-indexes report rewritten as a plain SELECT joining pg_class twice and LEFT JOIN pg_namespace (WHERE filters the left side, not the optional one), COALESCE/NULLIF name",
+  "concepts": {
+    "expected": [
+      "sql.innerJoin",
+      "sql.outerJoin",
+      "sql.null"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

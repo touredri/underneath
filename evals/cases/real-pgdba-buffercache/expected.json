@@ -1,0 +1,16 @@
+{
+  "about": "postgres_dba 55429a7: new pg_buffercache report aggregating buffers per relation with FILTER, percent-of-cache via a scalar subquery and COALESCE/NULLIF naming",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.innerJoin",
+      "sql.aggregation",
+      "sql.subquery",
+      "sql.null"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

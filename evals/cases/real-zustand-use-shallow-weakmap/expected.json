@@ -1,0 +1,19 @@
+{
+  "about": "zustand 2cadf65: useShallow keeps the previous slice in a module-level WeakMap keyed by a stable ref object instead of mutating ref.current",
+  "concepts": {
+    "expected": [
+      "react.customHook",
+      "react.useRef"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "useShallow",
+        "shallow",
+        "calls"
+      ]
+    ]
+  }
+}

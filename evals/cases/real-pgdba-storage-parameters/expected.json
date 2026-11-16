@@ -1,0 +1,15 @@
+{
+  "about": "postgres_dba 0b225aa: new report of relations with custom reloptions, unnesting options, a scalar subquery for the partition parent, and CASE notes on risky settings",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.innerJoin",
+      "sql.subquery",
+      "sql.null"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

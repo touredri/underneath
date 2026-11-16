@@ -1,0 +1,15 @@
+{
+  "about": "postgres_dba 714e5bc: new psql report grouping pg_stat_statements by first SQL keyword, with share-of-total window sums and NULLIF-guarded divisions, in two psql if/else branches",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.aggregation",
+      "sql.window",
+      "sql.null"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

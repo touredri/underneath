@@ -1,0 +1,31 @@
+{
+  "about": "zustand b4177b3: devtools adds api.devtools.cleanup(), which unsubscribes and removes the store from the tracked connections",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "devtoolsImpl",
+        "removeStoreFromTrackedConnections",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "extractConnectionInformation",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "getTrackedConnectionState",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "parseJsonThen",
+        "calls"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "about": "httpx 15d09a3: NO_PROXY entries that are IPv4, IPv6 or localhost map to exact-host mounts, detected by two new helpers that try ipaddress parsing",
+  "concepts": {
+    "expected": [
+      "py.comprehension",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "get_environment_proxies",
+        "is_ipv4_hostname",
+        "calls"
+      ],
+      [
+        "get_environment_proxies",
+        "is_ipv6_hostname",
+        "calls"
+      ]
+    ]
+  }
+}

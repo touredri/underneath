@@ -1,0 +1,10 @@
+{
+  "about": "zustand f999022: new ssrSafe middleware that returns a state creator whose setter throws during SSR",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

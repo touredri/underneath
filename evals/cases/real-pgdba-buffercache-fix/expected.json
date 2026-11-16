@@ -1,0 +1,16 @@
+{
+  "about": "postgres_dba 91f65b2: buffer cache report restricted to the current database and main fork, joined through pg_filenode_relation in a subquery, with ceil-based pct_of_rel",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.innerJoin",
+      "sql.aggregation",
+      "sql.subquery",
+      "sql.null"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

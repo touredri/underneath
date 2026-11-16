@@ -1,0 +1,23 @@
+{
+  "about": "httpx 550fff9: the request property (getter that raises RuntimeError when unset, and setter) moves from RequestError up to HTTPError",
+  "concepts": {
+    "expected": [
+      "py.property",
+      "py.exceptions"
+    ],
+    "allowed": [
+      "py.decorator",
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [],
+    "forbidden": [
+      [
+        "HTTPError.__init__",
+        "RequestError.__init__",
+        "calls"
+      ]
+    ]
+  }
+}

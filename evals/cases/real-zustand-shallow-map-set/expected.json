@@ -1,0 +1,10 @@
+{
+  "about": "zustand ed526d0: shallow() compares Map and Set instances by size and entries (for...of, Object.is)",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

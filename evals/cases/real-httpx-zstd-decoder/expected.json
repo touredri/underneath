@@ -1,0 +1,24 @@
+{
+  "about": "httpx 392dbe4: new ZStandardDecoder content decoder (optional zstandard import, multi-frame decode loop, incomplete-stream error); docstrings of iter_bytes/aiter_bytes updated",
+  "concepts": {
+    "expected": [
+      "py.exceptions",
+      "py.inheritance"
+    ],
+    "allowed": [
+      "py.generator",
+      "py.contextManager",
+      "py.asyncAwait"
+    ]
+  },
+  "edges": {
+    "expected": [],
+    "forbidden": [
+      [
+        "ZStandardDecoder.flush",
+        "ContentDecoder.flush",
+        "calls"
+      ]
+    ]
+  }
+}

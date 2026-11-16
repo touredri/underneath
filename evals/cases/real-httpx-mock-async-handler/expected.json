@@ -1,0 +1,20 @@
+{
+  "about": "httpx 084f356: MockTransport.arequest awaits the handler's result when the handler is an async function",
+  "concepts": {
+    "expected": [
+      "py.asyncAwait"
+    ],
+    "allowed": [
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "MockTransport.arequest",
+        "Request.aread",
+        "calls"
+      ]
+    ]
+  }
+}

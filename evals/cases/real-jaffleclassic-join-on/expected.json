@@ -1,0 +1,14 @@
+{
+  "about": "jaffle-shop-classic 8b69516: dbt customers and orders models replace LEFT JOIN ... USING (col) with explicit ON conditions for databases without USING",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.aggregation",
+      "sql.outerJoin"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

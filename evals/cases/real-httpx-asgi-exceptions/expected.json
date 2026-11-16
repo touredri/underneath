@@ -1,0 +1,23 @@
+{
+  "about": "httpx a682f6f: ASGITransport no longer re-raises app exceptions when raise_app_exceptions is False; it fills in a 500 response instead",
+  "concepts": {
+    "expected": [
+      "py.asyncAwait",
+      "py.exceptions",
+      "py.closure",
+      "py.comprehension"
+    ],
+    "allowed": [
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "ASGITransport.handle_async_request",
+        "create_event",
+        "calls"
+      ]
+    ]
+  }
+}

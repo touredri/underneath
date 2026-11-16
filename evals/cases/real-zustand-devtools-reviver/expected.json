@@ -1,0 +1,44 @@
+{
+  "about": "zustand d867e6f: devtools passes serialize.reviver to JSON.parse when parsing messages from the extension",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "devtoolsImpl",
+        "parseJsonThen",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "extractConnectionInformation",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "getTrackedConnectionState",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "removeStoreFromTrackedConnections",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "findCallerName",
+        "calls"
+      ],
+      [
+        "devtoolsImpl",
+        "shouldDispatchFromDevtools",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 8
+  }
+}

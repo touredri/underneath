@@ -1,0 +1,21 @@
+{
+  "about": "postgres_dba fa758fc: new lock-tree report in a transaction: recursive CTE over pg_blocking_pids() with UNION ALL, array_agg window and a correlated count subquery",
+  "concepts": {
+    "expected": [
+      "sql.transaction",
+      "sql.cte",
+      "sql.setOps",
+      "sql.window",
+      "sql.aggregation",
+      "sql.subquery"
+    ],
+    "allowed": [
+      "sql.innerJoin",
+      "sql.distinct",
+      "sql.null"
+    ]
+  },
+  "edges": {
+    "expected": []
+  }
+}

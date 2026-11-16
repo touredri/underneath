@@ -1,0 +1,19 @@
+{
+  "about": "zustand 3cbd468: add useShallow, a hook that keeps the previous selector result in a ref and returns it while shallow-equal",
+  "concepts": {
+    "expected": [
+      "react.customHook",
+      "react.useRef"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "useShallow",
+        "shallow",
+        "calls"
+      ]
+    ]
+  }
+}
