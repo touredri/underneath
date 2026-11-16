@@ -58,7 +58,7 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.2.1 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 17 tests and 18 eval cases green (100 % precision and recall, 0 false links, 0 wrong context), also on Python 3.10. Published on 2026-11-16 at https://github.com/touredri/underneath (public, `main`, tags `v0.1.0` and `v0.2.0`); the first CI run passed on Ubuntu 3.10, 3.13 and macOS 3.13.
+v0.2.1 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 17 tests and 18 eval cases green (100 % precision and recall, 0 false links, 0 wrong context), also on Python 3.10. Published on 2026-11-16 at https://github.com/touredri/underneath (public, `main`, tags `v0.1.0`, `v0.2.0`, `v0.2.1`, release v0.2.1); the first CI run passed on Ubuntu 3.10, 3.13 and macOS 3.13.
 
 Known limits: name-based call resolution (same class, same file, imports as hints), and built-in method names (`get`, `push`…) on other objects are never linked; only top-level functions and methods (no class nodes); SQL inside strings not parsed; regex-based concept rules.
 
@@ -66,7 +66,7 @@ Dogfooding frictions fixed in 0.2.1: utilities no longer take context slots; `mi
 
 ## Next steps (in order)
 
-1. Try the install from GitHub in a clean Claude Code: `/plugin marketplace add touredri/underneath`, `/plugin install underneath@underneath`, then remove the old `~/.claude/skills/underneath` symlink so the skill is not loaded twice. Create a GitHub release for v0.2.0 from the CHANGELOG.
+1. Watch the first real uses: install from GitHub (marketplace + `~/.underneath/venv`) was tested end to end on 0.2.1, as were the missing-dependency hint and the card at the end of a task. Release notes: GitHub releases, from CHANGELOG.md.
 2. v0.3: optional Graphify `graph.json` for callers outside the scan; classes as nodes; a larger eval set (cases from real diffs).
 3. v0.4: more stacks (Vue, Django, Go).
 
