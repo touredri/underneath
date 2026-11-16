@@ -10,6 +10,7 @@ All notable changes to underneath. The format follows [Keep a Changelog](https:/
 - `detect: tree <flag>` in stack files: structural patterns read from the syntax tree (a missing argument, an empty block, a call inside a loop body), for what a regex cannot see reliably.
 - Evaluation: likely-bug recall and false alarms (thresholds: at least 90 %, zero false alarms), six cases with each pattern and its safe version, and 22 more real commits (bulletproof-react, full-stack-fastapi-template, djangoproject.com): 76 cases in all.
 - `stop_hook_timeout` in `.underneath/config.json` (20 s by default).
+- `evals/tools/import_case.py` redacts key-shaped strings (API keys, tokens, private keys) when it copies a commit, even public test keys.
 
 ### Changed
 
