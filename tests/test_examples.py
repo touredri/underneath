@@ -449,6 +449,23 @@ def test_evals():
         assert by[case]["false_alarms"] == [] and by[case]["alarms_expected"] == 0, case
 
 
+def test_stop_hook_follows_the_code_not_the_tool():
+    """A file changed through Bash asks for the card; a Bash turn that only read does not; a slow extract gives up."""
+    repo = _git_repo("react-search")
+    bash = _transcript(repo.parent, ("prompt", "regenerate the client"), ("tool", "Bash"))
+    answer = _hook(repo, bash)
+    assert answer and "additionalContext" in answer["hookSpecificOutput"]  # sed, scripts, generators
+    shutil.copy(EX / "react-search" / "notes.json", repo / ".underneath" / "notes.json")
+    subprocess.run([sys.executable, CLI, "render"], cwd=repo, capture_output=True, check=True)
+    look = _transcript(repo.parent, ("prompt", "what changed?"), ("tool", "Bash"))  # git status, ls...
+    assert _hook(repo, look) is None
+    (repo / ".underneath" / "config.json").write_text(json.dumps({"stop_hook_timeout": 0.001}))
+    (repo / "src" / "lib" / "sort.ts").write_text((repo / "src" / "lib" / "sort.ts").read_text() + "\nexport const BY = 'name';\n")
+    slow = _hook(repo, bash)
+    assert slow and "took longer than" in slow["systemMessage"] and "hookSpecificOutput" not in slow
+    assert _hook(repo, bash) is None  # said once a day, never blocking
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

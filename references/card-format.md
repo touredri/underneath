@@ -49,10 +49,12 @@ The agent only explains. It never adds functions or concepts: those come from th
 {
   "language": "fr",
   "stop_hook": false,
+  "stop_hook_timeout": 20,
   "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 }
 }
 ```
 
 - `language`: language of the notes (default English).
 - `stop_hook`: `false` turns off the Claude Code plugin's Stop hook for this project (default on).
+- `stop_hook_timeout`: seconds the hook gives `extract` before it skips the card and says so once a day (default 20).
 - `limits`: map budgets; `min_lines` is the size under which a change with nothing new is skipped.

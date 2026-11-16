@@ -9,7 +9,9 @@ It stays quiet when:
 - `stop_hook_active` is true (the agent is already continuing because of a Stop hook);
 - `.underneath/config.json` has `"stop_hook": false`;
 - the cwd is not a git repository;
-- the transcript shows no file edit (Edit, Write, MultiEdit, NotebookEdit) since the last prompt;
+- the transcript shows no tool that can write files (Edit, Write, MultiEdit, NotebookEdit, Bash) since the last prompt;
+- the code is the same as at the previous stop (a Bash turn that only read);
+- `extract` takes longer than `stop_hook_timeout` (20 s by default): it says so once a day;
 - `extract` says the change is small or there is nothing to map;
 - the card for this exact graph was already rendered, or already asked for.
 
@@ -30,7 +32,8 @@ sys.path.insert(0, str(HERE))
 
 from ids import change_id  # noqa: E402 - no third-party import: the hook runs on any python3
 CLI = HERE / "underneath.py"
-EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"}  # Bash: sed, scripts, generators
+DEFAULT_TIMEOUT = 20.0  # seconds for extract; "stop_hook_timeout" in config.json changes it
 QUIET = ("underneath: small change", "underneath: no supported changes")
 
 
@@ -87,14 +90,24 @@ def decide(hook_input: dict) -> dict | None:
     if root is None:
         return None
     out = root / ".underneath"
-    if _load(out / "config.json", {}).get("stop_hook") is False:
+    config = _load(out / "config.json", {})
+    if config.get("stop_hook") is False:
         return None
     if not edited_this_turn(hook_input.get("transcript_path")):
         return None
 
     try:
-        r = subprocess.run([sys.executable, str(CLI), "extract"], cwd=root, capture_output=True, text=True, timeout=120)
-    except (OSError, subprocess.TimeoutExpired):
+        timeout = float(config.get("stop_hook_timeout", DEFAULT_TIMEOUT))
+    except (TypeError, ValueError):
+        timeout = DEFAULT_TIMEOUT
+    try:
+        r = subprocess.run([sys.executable, str(CLI), "extract"], cwd=root, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return _notice(out, "slow", (
+            f"underneath: extract took longer than {timeout:g} s, so the card was skipped. "
+            'Raise "stop_hook_timeout" in .underneath/config.json, or run /underneath by hand.'
+        ))
+    except OSError:
         return None
     if r.returncode != 0:
         return _missing_dependency(out) if "needs tree-sitter" in r.stderr + r.stdout else None
@@ -107,12 +120,15 @@ def decide(hook_input: dict) -> dict | None:
         return None
     gid = change_id(graph)
     state = _load(out / "hook.json", {})
-    if gid in (_load(out / "registry.json", {}).get("last_change"), state.get("asked")):
-        return None
-    state["asked"] = gid
+    seen, state["seen"] = state.get("seen"), gid
+    quiet = gid == seen or gid in (_load(out / "registry.json", {}).get("last_change"), state.get("asked"))
+    if not quiet:
+        state["asked"] = gid
     try:
         (out / "hook.json").write_text(json.dumps(state), encoding="utf8")
     except OSError:
+        return None
+    if quiet:  # nothing new since the last stop, or this change was already shown or asked for
         return None
 
     reason = (
@@ -129,25 +145,29 @@ def decide(hook_input: dict) -> dict | None:
     return {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": reason}}
 
 
-def _missing_dependency(out: Path) -> dict | None:
-    """Say once a day how to install tree-sitter, without blocking."""
+def _notice(out: Path, key: str, text: str) -> dict | None:
+    """A message for the user, at most once a day per kind, never blocking."""
     state = _load(out / "hook.json", {})
     today = date.today().isoformat()
-    if state.get("warned") == today:
+    warned = state.get("warned") if isinstance(state.get("warned"), dict) else {}
+    if warned.get(key) == today:
         return None
-    state["warned"] = today
+    warned[key] = today
+    state["warned"] = warned
     try:
         out.mkdir(parents=True, exist_ok=True)
         (out / "hook.json").write_text(json.dumps(state), encoding="utf8")
     except OSError:
         pass
+    return {"systemMessage": text}
+
+
+def _missing_dependency(out: Path) -> dict | None:
     req = HERE.parent / "requirements.txt"
-    return {
-        "systemMessage": (
-            "underneath: tree-sitter is not installed, so the card is skipped. Install it once with: "
-            f"python3 -m venv ~/.underneath/venv && ~/.underneath/venv/bin/pip install -r {req}"
-        )
-    }
+    return _notice(out, "dependency", (
+        "underneath: tree-sitter is not installed, so the card is skipped. Install it once with: "
+        f"python3 -m venv ~/.underneath/venv && ~/.underneath/venv/bin/pip install -r {req}"
+    ))
 
 
 def main() -> int:
