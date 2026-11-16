@@ -67,7 +67,9 @@ class Symbol:
     refs: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
     member_only: list[str] = field(default_factory=list)  # names only called as `other.name()`, never bare or on self/this
-    chained: list[str] = field(default_factory=list)  # names only called on `a.b.name()` / `self.x.name()` / `f().name()`
+    blocked: list[str] = field(default_factory=list)  # names only called on a chain (`a.b.m()`) or on a local of unknown type
+    bare_only: list[str] = field(default_factory=list)  # names only called bare (`f()`): a function or a class, never a method
+    attr_types: dict = field(default_factory=dict)  # classes only: attribute -> class, from what the code states
     bases: list[str] = field(default_factory=list)  # classes only: what it extends
     typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known
     embedded_sql: list[str] = field(default_factory=list)  # SQL written in this function's strings
@@ -206,7 +208,10 @@ def _ctor(node, src) -> str | None:
         if node.type == "await":
             return None
         fn = node.child_by_field_name("function")
-        return _type_name(_text(fn, src)) if fn is not None and fn.type in ("identifier", "attribute") else None
+        text = _text(fn, src) if fn is not None else ""
+        if text.endswith(".as_manager"):  # Django: objects = MyQuerySet.as_manager()
+            return _type_name(text[: -len(".as_manager")])
+        return _type_name(text) if fn is not None and fn.type in ("identifier", "attribute") else None
     return None
 
 
@@ -274,8 +279,16 @@ def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]
         if obj is None or meth is None:
             continue
         t = None
+        root = obj
+        while root.type in ("call", "call_expression"):  # self.filter(...).order_by(...).m(): a fluent chain
+            f = root.child_by_field_name("function")
+            if f is None or f.type not in ("attribute", "member_expression"):
+                break
+            root = f.child_by_field_name("object") or root
         if obj.type == "super" or _text(obj, src) == "super()":
             t = attrs.get("__super__", "object")  # the base class; `object` links nothing
+        elif root is not obj and (root.type == "this" or _text(root, src) == own):
+            t = attrs.get("__self__")  # a chain of the class's own calls stays in the class
         elif obj.type == "identifier":
             t = env.get(_text(obj, src))
         elif obj.type in ("attribute", "member_expression"):
@@ -283,6 +296,8 @@ def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]
             attr = obj.child_by_field_name("attribute" if obj.type == "attribute" else "property")
             if inner is not None and attr is not None and _text(inner, src) == own:
                 t = attrs.get(_text(attr, src))
+            elif inner is not None and attr is not None and inner.type == "identifier" and _type_name(_text(inner, src)):
+                t = f"{_text(inner, src)}.{_text(attr, src)}"  # Model.objects.m(): the class says what `objects` is
         if t:
             pair = [_text(meth, src), t]
             if pair not in out:
@@ -434,23 +449,55 @@ def _member_only(calls: list[str], direct: set[str]) -> list[str]:
     return sorted(set(calls) - direct)
 
 
-def _chained(node, src) -> list[str]:
-    """Methods called only on a chain (`self.x.m()`, `a.b.m()`, `f().m()`): never a module function."""
-    chain, plain = set(), set()
-    for n in _nodes(node, ("call", "call_expression")):
-        fn = n.child_by_field_name("function")
+def _pattern_names(node, src) -> set[str]:
+    return {_text(n, src) for n in _walk(node) if n.type in ("identifier", "shorthand_property_identifier_pattern")}
+
+
+def _locals(fn, src) -> set[str]:
+    """Parameters and names bound inside a function: never a module, never a module-level function."""
+    names: set[str] = set()
+    params = fn.child_by_field_name("parameters")
+    for p in params.named_children if params is not None else []:
+        target = p.child_by_field_name("pattern") or p.child_by_field_name("name") or p
+        if p.type in ("default_parameter", "typed_default_parameter", "assignment_pattern"):
+            target = p.child_by_field_name("name") or p.child_by_field_name("left") or p
+        if p.type == "typed_parameter":
+            target = next((c for c in p.named_children if c.type == "identifier"), p)
+        names |= _pattern_names(target, src) if target.type != "type" else set()
+    for n in _nodes(fn, ("assignment", "variable_declarator", "for_statement", "for_in_statement")):
+        left = n.child_by_field_name("left") or n.child_by_field_name("name")
+        if left is not None and left.type not in ("attribute", "member_expression", "subscript", "subscript_expression"):
+            names |= _pattern_names(left, src)
+    return names - {"self", "cls", "this"}
+
+
+def _call_kinds(node, src, local_names: set[str]) -> tuple[list[str], list[str]]:
+    """(blocked, bare_only) from how each name is called: bare, on self, on a module, on a local, on a chain."""
+    kinds: dict[str, set[str]] = {}
+    for n in _nodes(node, ("call", "call_expression", "new_expression")):
+        fn = n.child_by_field_name("constructor" if n.type == "new_expression" else "function")
         if fn is None:
             continue
-        if fn.type in ("attribute", "member_expression"):
+        if fn.type == "identifier":
+            name, kind = _text(fn, src), ("local" if _text(fn, src) in local_names else "bare")
+        elif fn.type in ("attribute", "member_expression"):
             obj = fn.child_by_field_name("object")
             meth = fn.child_by_field_name("attribute" if fn.type == "attribute" else "property")
-            if meth is None:
+            if meth is None or obj is None:
                 continue
-            on_chain = obj is not None and obj.type not in ("identifier", "this", "super") and _text(obj, src) != "super()"
-            (chain if on_chain else plain).add(_text(meth, src))
-        elif fn.type == "identifier":
-            plain.add(_text(fn, src))
-    return sorted(chain - plain)
+            name, recv = _text(meth, src), _text(obj, src)
+            if obj.type in ("this", "super") or recv in ("self", "cls", "super()"):
+                kind = "self"
+            elif obj.type == "identifier":
+                kind = "local" if recv in local_names else "module"
+            else:
+                kind = "chain"
+        else:
+            continue
+        kinds.setdefault(name, set()).add(kind)
+    blocked = sorted(n for n, k in kinds.items() if k <= {"chain", "local"})
+    bare_only = sorted(n for n, k in kinds.items() if k == {"bare"})
+    return blocked, bare_only
 
 
 def _js_calls(node, src):
@@ -537,9 +584,10 @@ def _parse_js(path, src, lang):
         source = _text(src_node, src)
         calls, renders, direct = _js_calls(node, src)
         env, attrs = _js_env(_js_fn(node), src, module_env)
+        kinds = _call_kinds(node, src, _locals(_js_fn(node), src))
         sql = _embedded_sql(node, src)
         if kind == "method":
-            attrs = {**class_attrs.get(qual.split(".")[0], {}), **attrs}
+            attrs = {**class_attrs.get(qual.split(".")[0], {}), **attrs, "__self__": qual.split(".")[0]}
         k = kind or _js_kind(name, node)
         out.append(
             Symbol(
@@ -555,7 +603,8 @@ def _parse_js(path, src, lang):
                 calls=calls,
                 renders=renders,
                 member_only=_member_only(calls, direct),
-                chained=_chained(node, src),
+                blocked=kinds[0],
+                bare_only=kinds[1],
                 typed_calls=_typed_calls(node, src, env, attrs, "js"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
@@ -595,7 +644,7 @@ def _parse_js(path, src, lang):
                 start_line=outer.start_point[0] + 1, end_line=outer.end_point[0] + 1,
                 source=source, signature=_signature(head.strip() + " {"),
                 calls=calls, member_only=_member_only(calls, direct),
-                bases=[b.split(".")[-1] for b in bases], exported=exported,
+                bases=[b.split(".")[-1] for b in bases], exported=exported, attr_types=dict(attrs),
             )
         )
 
@@ -708,9 +757,10 @@ def _parse_py(path, src, lang):
         source = _text(outer, src)
         calls, direct = _py_calls(defn, src)
         env, attrs = _py_env(defn, src, module_env)
+        kinds = _call_kinds(defn, src, _locals(defn, src))
         sql = _embedded_sql(defn, src)
         if cls:
-            attrs = {**class_attrs.get(cls, {}), **attrs}
+            attrs = {**class_attrs.get(cls, {}), **attrs, "__self__": cls}
         out.append(
             Symbol(
                 file=path,
@@ -724,7 +774,8 @@ def _parse_py(path, src, lang):
                 signature=_signature(source),
                 calls=calls,
                 member_only=_member_only(calls, direct),
-                chained=_chained(defn, src),
+                blocked=kinds[0],
+                bare_only=kinds[1],
                 typed_calls=_typed_calls(defn, src, env, attrs, "python"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
@@ -773,7 +824,7 @@ def _parse_py(path, src, lang):
                 start_line=outer.start_point[0] + 1, end_line=outer.end_point[0] + 1,
                 source=source, signature=_signature(head),
                 calls=calls, member_only=_member_only(calls, direct), decorators=decorators(outer),
-                bases=bases, exported=not cname.startswith("_"),
+                bases=bases, exported=not cname.startswith("_"), attr_types=dict(attrs),
             )
         )
 

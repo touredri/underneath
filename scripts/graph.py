@@ -29,7 +29,9 @@ UTILITY_WEIGHT = 0.1  # ...and weighs this much as context
 MOVE_SIMILARITY = 0.6  # below this, a same-named symbol elsewhere is a rewrite, not a move
 EXTRACT_SHARE = 0.9  # share of a new symbol's lines found in one old symbol to call it extracted
 
-_TEST = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*\.py$|_test\.py$|\.(test|spec)\.[jt]sx?$")
+_TEST = re.compile(
+    r"(^|/)(tests?|__tests__|spec|testing)/|(^|/)(test_[^/]*|[^/]*_tests?|tests?|tests_[^/]*|conftest)\.py$|\.(test|spec)\.[jt]sx?$"
+)
 
 
 def is_test(path: str) -> bool:
@@ -337,9 +339,11 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         if s.lang == "sql" and short != s.name:
             by_name[short].append(s)
 
-    def resolve(src: Symbol, name: str) -> Symbol | None:
+    def resolve(src: Symbol, name: str, methods: bool = True) -> Symbol | None:
         # Sorted by place in the code, so the choice never depends on parse order.
         cands = sorted((c for c in by_name.get(name, []) if c.key != src.key), key=lambda c: (c.file, c.start_line, c.qualname))
+        if not methods:  # `render(...)` called bare is a function or a class, never some class's method
+            cands = [c for c in cands if c.kind != "method"]
         if not cands:
             return None
         same = [c for c in cands if c.file == src.file]
@@ -366,7 +370,12 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         return (same or imported or (cands if len(cands) == 1 else [None]))[0]
 
     def method_of(src: Symbol, cls: str, meth: str, depth: int = 0) -> Symbol | None:
-        """`cls.meth`, or the method a base class provides."""
+        """`cls.meth`, or the method a base class provides. `Model.objects` uses the type the class gives it."""
+        if "." in cls:
+            owner, attr = cls.split(".", 1)
+            klass = pick(src, [c for c in by_name.get(owner, []) if c.kind == "class"])
+            t = klass.attr_types.get(attr) if klass is not None else None
+            return method_of(src, t, meth, depth + 1) if t and depth < 4 else None
         hit = pick(src, [c for c in by_name.get(meth, []) if c.qualname.split("#")[0] == f"{cls}.{meth}"])
         if hit is not None or depth >= 4:
             return hit
@@ -391,9 +400,10 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         # A typed receiver whose class is not ours (`session: requests.Session`) links nothing by name either.
         guess |= typed & set(s.member_only)
         # `self.decompressor.flush()`: an object of unknown type, so no guess by name either.
-        guess |= set(s.chained)
+        guess |= set(s.blocked)
+        bare = set(s.bare_only)
         for name in set(s.calls) - guess:
-            t = resolve(s, name)
+            t = resolve(s, name, methods=name not in bare)
             if t is not None:
                 edges.add((s.key, t.key, "calls"))
         for name in set(s.renders):
