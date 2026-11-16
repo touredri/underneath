@@ -91,6 +91,34 @@ Same format as `react.md`. Rules run on each statement's text, case-insensitivel
 - pitfalls: Foreign key columns are not indexed automatically in PostgreSQL; `ON DELETE CASCADE` can delete far more than expected.
 - relates: sql.index
 
+## Comparison with NULL
+- id: sql.equalsNull
+- detect: regex \b(WHERE|HAVING|WHEN|JOIN)\b(?:(?!\bSET\b)[^;])*?(?<![<>!=:])(?:=|<>|!=)\s*NULL\b
+- risk: yes
+- fundamental: three-valued-logic
+- what: `x = NULL` is never true, not even when x is NULL: the comparison is unknown.
+- pitfalls: The filter silently matches nothing. Use `IS NULL` / `IS NOT NULL`.
+- relates: sql.null
+
+## NOT IN with a subquery
+- id: sql.notInNull
+- detect: regex \bNOT\s+IN\s*\(\s*SELECT\b
+- risk: yes
+- fundamental: three-valued-logic
+- what: Keeps rows whose value is not in the subquery's result.
+- pitfalls: If the subquery returns a single NULL, NOT IN is unknown for every row and the query returns nothing. Use `NOT EXISTS`, or filter the NULLs out.
+- relates: sql.subquery, sql.null
+
+## UPDATE or DELETE without WHERE
+- id: sql.updateNoWhere
+- detect: regex \bUPDATE\s+[\w."]+\s+SET\b(?![^;]*\bWHERE\b)
+- detect: regex \bDELETE\s+FROM\s+[\w."]+(?![^;]*\bWHERE\b)
+- risk: yes
+- fundamental: transactions
+- what: Changes or deletes every row of the table.
+- pitfalls: Usually a forgotten WHERE. If it is intended (a migration), say so; run it in a transaction you can roll back.
+- relates: sql.transaction
+
 ## Constraints
 - id: sql.constraints
 - detect: regex \b(PRIMARY\s+KEY|UNIQUE|CHECK\s*\(|(?<!\bIS\s)NOT\s+NULL)\b

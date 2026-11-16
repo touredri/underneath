@@ -1,0 +1,5 @@
+{
+  "about": "The safe versions: one query with IN and a loop over its rows, IS NOT NULL, an except that logs, a commented fallback",
+  "concepts": {"expected": ["py.comprehension", "py.exceptions", "sql.null"], "allowed": []},
+  "edges": {"expected": []}
+}

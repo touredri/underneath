@@ -1,0 +1,9 @@
+{
+  "about": "React and JS likely bugs: effect without deps that sets state, async effect, index key, forEach(async), empty catch",
+  "concepts": {
+    "expected": ["react.effectNoDeps", "react.asyncEffect", "react.indexKey", "js.forEachAsync", "js.emptyCatch",
+                 "react.useState", "react.useEffect", "react.keys", "web.fetch", "js.asyncAwait"],
+    "allowed": []
+  },
+  "edges": {"expected": []}
+}

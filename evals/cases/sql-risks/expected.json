@@ -1,0 +1,5 @@
+{
+  "about": "SQL likely bugs: = NULL, NOT IN with a subquery, UPDATE and DELETE without WHERE",
+  "concepts": {"expected": ["sql.equalsNull", "sql.notInNull", "sql.updateNoWhere", "sql.subquery"], "allowed": []},
+  "edges": {"expected": [["active_users", "users", "reads"], ["never_ordered", "users", "reads"]]}
+}

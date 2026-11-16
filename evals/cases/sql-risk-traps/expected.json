@@ -1,0 +1,5 @@
+{
+  "about": "The safe versions: IS NULL, NULLIF, NOT EXISTS and NOT IN a list, SET x = NULL with WHERE or in ON CONFLICT, DELETE with WHERE",
+  "concepts": {"expected": ["sql.null", "sql.subquery", "sql.upsert"], "allowed": []},
+  "edges": {"expected": [["active_users", "users", "reads"], ["never_ordered", "users", "reads"]]}
+}

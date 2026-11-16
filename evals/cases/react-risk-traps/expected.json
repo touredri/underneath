@@ -1,0 +1,5 @@
+{
+  "about": "The safe versions: deps array, effect without state, async function inside the effect, key from the data, for...of with await, a commented catch",
+  "concepts": {"expected": ["react.useState", "react.useEffect", "react.keys", "web.fetch", "js.asyncAwait"], "allowed": []},
+  "edges": {"expected": []}
+}

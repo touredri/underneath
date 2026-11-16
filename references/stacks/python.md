@@ -81,6 +81,24 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 - pitfalls: A default `[]` or `{}` is shared by every call and keeps growing. Use `None` and create it inside.
 - relates:
 
+## Swallowed exception
+- id: py.swallowedException
+- detect: tree swallowed-exception
+- risk: yes
+- fundamental: exceptions
+- what: An `except` block that does nothing (`pass`, `...`, `continue`).
+- pitfalls: Real bugs vanish with the error you meant to ignore. Catch the narrowest exception, log it, or say in a comment why it is safe.
+- relates: py.exceptions
+
+## Query in a loop
+- id: py.queryInLoop
+- detect: tree query-in-loop
+- risk: yes
+- fundamental: set-theory
+- what: Runs one database query per loop iteration (the N+1 problem).
+- pitfalls: 100 rows means 101 round trips. Load them in one query: a join, `IN (...)`, `selectinload` / `select_related`.
+- relates: sql.innerJoin
+
 ## Dataclasses
 - id: py.dataclass
 - detect: regex @(dataclasses\.)?dataclass

@@ -441,6 +441,12 @@ def test_evals():
     assert by["js-signal-trap"]["invented"] == []  # a variable named signal is not an AbortController
     assert by["py-dict-get-false-link"]["false_links"] == [] and by["js-push-false-link"]["false_links"] == []
     assert report["total"]["concept_precision"] == 1.0
+    # Likely bugs: each rule fires on its pattern and stays quiet on the safe version next to it.
+    assert report["total"]["false_alarms"] == 0
+    for case in ("react-risks", "py-risks", "sql-risks"):
+        assert by[case]["missed_alarms"] == [] and by[case]["alarms_found"] >= 3, case
+    for case in ("react-risk-traps", "py-risk-traps", "sql-risk-traps"):
+        assert by[case]["false_alarms"] == [] and by[case]["alarms_expected"] == 0, case
 
 
 if __name__ == "__main__":

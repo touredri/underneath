@@ -20,6 +20,7 @@ class Concept:
     calls: list[str] = field(default_factory=list)
     regexes: list[re.Pattern] = field(default_factory=list)
     names: list[re.Pattern] = field(default_factory=list)
+    trees: list[str] = field(default_factory=list)  # structural flags computed by parse.py
     requires: list[str] = field(default_factory=list)
     fundamental: str = ""
     what: str = ""
@@ -78,6 +79,8 @@ def load_concepts(ref_dir: Path) -> dict[str, Concept]:
                         c.regexes.append(re.compile(arg, flags | re.MULTILINE))
                     elif kind == "name":
                         c.names.append(re.compile(arg))
+                    elif kind == "tree":
+                        c.trees.append(arg)
                 elif key == "requires" and val:
                     c.requires += [v.strip() for v in val.split(",") if v.strip()]
                 elif key == "fundamental":
@@ -147,6 +150,7 @@ def detect(symbol: Symbol, catalogue: dict[str, Concept]) -> list[str]:
             any(name in calls for name in c.calls)
             or any(rx.search(code) for rx in c.regexes)
             or any(rx.search(symbol.name) for rx in c.names)
+            or any(t in symbol.flags for t in c.trees)
         )
         if hit:
             found.append(c.id)

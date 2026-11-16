@@ -1,0 +1,5 @@
+{
+  "about": "Python likely bugs: a query per loop iteration, `= NULL` in a SQL string, a swallowed exception",
+  "concepts": {"expected": ["py.queryInLoop", "sql.equalsNull", "py.swallowedException", "py.exceptions"], "allowed": []},
+  "edges": {"expected": []}
+}

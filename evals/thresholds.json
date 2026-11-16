@@ -4,5 +4,7 @@
   "wrong_status_max": 0,
   "concept_recall_min": 0.95,
   "edge_recall_min": 0.95,
-  "wrong_context_max": 0
+  "wrong_context_max": 0,
+  "false_alarms_max": 0,
+  "alarm_recall_min": 0.9
 }

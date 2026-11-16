@@ -63,6 +63,7 @@ def evaluate(case: Path, catalogue) -> dict:
     found = {c["id"] for c in g["concepts"]} | set(g["summary"].get("more_concept_ids", []))
     want = set(spec.get("concepts", {}).get("expected", []))
     ok = want | set(spec.get("concepts", {}).get("allowed", []))
+    risky = {cid for cid, c in catalogue.items() if c.risk}
 
     edges = {(label[e["from"]], label[e["to"]], e["type"]) for e in g["edges"] if e["type"] != "uses"}
     es = spec.get("edges", {})
@@ -84,6 +85,10 @@ def evaluate(case: Path, catalogue) -> dict:
         "concepts_expected": len(want),
         "invented": sorted(found - ok),
         "missed": sorted(want - found),
+        "alarms_expected": len(want & risky),
+        "alarms_found": len(want & risky & found),
+        "false_alarms": sorted((found & risky) - ok),
+        "missed_alarms": sorted((want & risky) - found),
         "edges_expected": len(exp_edges),
         "edges_found": len(exp_edges & edges),
         "missing_edges": sorted(map(list, exp_edges - edges)),
@@ -109,6 +114,8 @@ def summarize(results: list[dict]) -> dict:
     missed = sum(len(r["missed"]) for r in results)
     e_want = sum(r["edges_expected"] for r in results)
     e_found = sum(r["edges_found"] for r in results)
+    a_want = sum(r["alarms_expected"] for r in results)
+    a_found = sum(r["alarms_found"] for r in results)
     return {
         "cases": len(results),
         "concept_precision": round((found - invented) / found, 3) if found else 1.0,
@@ -118,6 +125,8 @@ def summarize(results: list[dict]) -> dict:
         "false_links": sum(len(r["false_links"]) for r in results),
         "wrong_status": sum(len(r["wrong_status"]) for r in results),
         "wrong_context": sum(len(r["wrong_context"]) for r in results),
+        "alarm_recall": round(a_found / a_want, 3) if a_want else 1.0,
+        "false_alarms": sum(len(r["false_alarms"]) for r in results),
     }
 
 
@@ -160,13 +169,14 @@ def main(argv=None) -> int:
             f"{r['case']:<{w}}  {r['concepts_found']:>8}  {len(r['invented']):>8}  {len(r['missed']):>6}  "
             f"{r['edges_found']:>2}/{r['edges_expected']:<2}  {len(r['false_links']):>11}"
         )
-        for key in ("invented", "missed", "missing_edges", "false_links", "wrong_status", "wrong_context"):
+        for key in ("false_alarms", "missed_alarms", "invented", "missed", "missing_edges", "false_links", "wrong_status", "wrong_context"):
             if r[key]:
                 print(f"{'':<{w}}    {key.replace('_', ' ')}: {r[key]}")
     print(
         f"\nprecision {total['concept_precision']:.1%} ({total['invented_concepts']} invented) · "
         f"recall {total['concept_recall']:.1%} · edge recall {total['edge_recall']:.1%} · "
         f"{total['false_links']} false link(s) · {total['wrong_status']} wrong status · {total['wrong_context']} wrong context · {total['cases']} cases"
+        f"\nlikely bugs: {total['alarm_recall']:.1%} found · {total['false_alarms']} false alarm(s)"
     )
     for f in fails:
         print(f"FAIL {f}")

@@ -144,6 +144,51 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 - pitfalls: Using `this` before calling `super()` in a constructor throws; overriding without calling `super.method()` drops the parent's behaviour.
 - relates: js.class
 
+## Effect without dependencies
+- id: react.effectNoDeps
+- detect: tree effect-no-deps-sets-state
+- risk: yes
+- fundamental: reference-equality
+- what: An effect with no dependency array runs after every render; when it sets state, that state change renders again and the effect runs again.
+- pitfalls: An infinite render loop; a request sent on every render. Pass the values it depends on, or `[]` to run it once.
+- relates: react.useEffect, react.useState
+
+## Async effect
+- id: react.asyncEffect
+- detect: tree async-effect
+- risk: yes
+- fundamental: promises
+- what: useEffect expects its callback to return nothing or a cleanup function; an async callback returns a promise instead.
+- pitfalls: The cleanup never runs and errors become unhandled rejections. Define the async function inside the effect and call it.
+- relates: react.useEffect, react.effectCleanup
+
+## Index as key
+- id: react.indexKey
+- detect: tree index-key
+- risk: yes
+- fundamental: reference-equality
+- what: Uses each item's position in the list as its identity.
+- pitfalls: When items are inserted, removed or sorted, React keeps state and inputs on the wrong item. Fine only for a list that never changes order.
+- relates: react.keys
+
+## forEach with async
+- id: js.forEachAsync
+- detect: tree foreach-async
+- risk: yes
+- fundamental: promises
+- what: forEach ignores the promises its async callback returns, so nothing waits for them.
+- pitfalls: Code after the loop runs before the work is done, and errors are unhandled. Use `for...of` with `await`, or `Promise.all(items.map(...))`.
+- relates: js.asyncAwait, js.promiseAll
+
+## Empty catch
+- id: js.emptyCatch
+- detect: tree empty-catch
+- risk: yes
+- fundamental: exceptions
+- what: Catches an error and does nothing with it.
+- pitfalls: Failures disappear without a trace. Log it, rethrow it, or say in a comment why ignoring it is safe.
+- relates: js.asyncAwait
+
 ## AbortController
 - id: web.AbortController
 - detect: regex new\s+AbortController
