@@ -33,10 +33,11 @@ In a randomized controlled trial, Anthropic found that developers learning a new
 - **Read from the code vs inferred.** Solid lines are extracted from the source. Dashed purple lines ("triggers", "aborts") are the agent's interpretation, and look like it.
 - **One floor down.** Every concept points to the language fundamental it rests on: `useEffect` → closures, `useMemo` → reference equality, `LEFT JOIN` → three-valued logic. `/underneath deeper closures` shows a 10-line example.
 - **Built for people who won't read.** 5 lines of text. At most 7 changed functions, 3 context functions and 5 concepts on the map. Everything else is one click away.
-- **Honest about what changed.** Code moved to another file, or pulled out of a big function, is marked *moved*, not new. Tests are not drawn: they become "tested by N" on the functions they call.
+- **Honest about what changed.** Code moved to another file, or pulled out of a big function, is marked *moved*, not new. Editing only a docstring is no change. Tests are not drawn: they become "tested by N" on the functions they call.
+- **Links you can trust.** `cache.get(k)` links to `ReportCache.get` when the code says `cache: ReportCache`; `rows.get(k)` on a dict links to nothing. Classes, `extends` and `super()` are followed; SQL written in Python or JS strings is read as SQL.
 - **Likely bugs surface by themselves.** Some rules are marked `risk` (a mutable default argument in Python, a `WHERE` that undoes a `LEFT JOIN`). They are always drawn and the agent must check them.
 - **It remembers what you know.** A local registry counts the concepts you have seen. New ones get a thick border; familiar ones fade out. `/underneath gaps` lists the ones you never marked as known.
-- **Measured.** An evaluation set of 18 diffs checks that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
+- **Measured.** 48 diffs, half of them real commits of open-source projects, check that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
 - **Local.** No network, no telemetry. `.underneath/` ignores itself in git.
 
 ![The fundamental panel for a SQL change, dark mode](docs/map-sql-dark.png)
@@ -84,18 +85,19 @@ Work as usual. At the end of a task the agent runs the skill and shows the card.
 - `/underneath since main`: map everything since `main`
 - `/underneath map`: the whole project's concept skeleton
 - `/underneath gaps`: concepts in your code you never marked as known
+- `/underneath log`: what the cards of the last 7 days showed (`--days N` for another period)
 - `/underneath deeper closures`: the fundamental, with a minimal example
 - `/underneath known react.useState`: stop highlighting a concept you know
 
 ### The project map
 
-`/underneath map` reads every file once and groups the concepts of your code by the fundamental they rest on: one row per fundamental, its concepts most used first, each with its use count and main files. Here it is on this repository:
+`/underneath map` reads every file once and groups the concepts of your code by the fundamental they rest on: one row per fundamental, its concepts most used first, each with its use count and main files. Here it is on the `examples/` folder of this repository:
 
 ```
-underneath map · 120 files · 265 functions · 42 concepts on 15 fundamentals
-  top   higher-order functions 41 · exceptions 28 · iterators 28
-  ⚠     Mutable defaults ×2 · first at examples/project-map/api/app/services.py:4 (+1 other)
-  gaps  42 never marked known · /underneath gaps
+underneath map · 48 files · 76 functions · 29 concepts on 14 fundamentals
+  top   event loop 19 · closures 14 · higher-order functions 9
+  ⚠     Mutable defaults ×2 · first at project-map/api/app/services.py:4 (+1 other)
+  gaps  29 never marked known · /underneath gaps
   map   .underneath/map.html
 ```
 
@@ -104,11 +106,11 @@ underneath map · 120 files · 265 functions · 42 concepts on 15 fundamentals
 `/underneath gaps` turns it into a reading list:
 
 ```
-underneath gaps · 42 of 42 concepts in your code never marked known, most used first
-  Comprehensions      24×  /underneath deeper py.comprehension
-  Exceptions          21×  /underneath deeper py.exceptions
+underneath gaps · 29 of 29 concepts in your code never marked known, most used first
   async / await (py)  16×  /underneath deeper py.asyncAwait
-  useState             8×  /underneath deeper react.useState
+  Decorators           7×  /underneath deeper py.decorator
+  useState             6×  /underneath deeper react.useState
+  Context managers     4×  /underneath deeper py.contextManager
 ```
 
 ### Run it yourself
@@ -118,6 +120,7 @@ python3 scripts/underneath.py extract            # brief for the agent + .undern
 python3 scripts/underneath.py render             # card + .underneath/latest.html
 python3 scripts/underneath.py map                # card + .underneath/map.html
 python3 scripts/underneath.py gaps
+python3 scripts/underneath.py log --days 30
 python3 scripts/underneath.py deeper three-valued-logic
 ```
 
@@ -150,13 +153,13 @@ git diff ──▶ tree-sitter ──▶ graph.json ──▶ agent writes notes
 ```
 
 1. **Scope.** Changed files against `HEAD` (or `--base`), untracked files included.
-2. **Extract.** Top-level functions, methods, components, hooks, SQL tables, views, indexes, in the changed files and in the files that can connect to them (found with `git grep`, so a large repository is not parsed whole). Calls, JSX renders, decorators and SQL references become edges. Each symbol is new, modified, moved or context.
+2. **Extract.** Top-level functions, classes, methods, components, hooks, SQL tables, views, indexes, in the changed files and in the files that can connect to them (found with `git grep`, so a large repository is not parsed whole). Calls, JSX renders, decorators, base classes and SQL references (in `.sql` files and in SQL strings) become edges; a method call is resolved through its receiver's type when the code states it. Each symbol is new, modified, moved or context.
 3. **Rank.** Changed symbols are scored by status, connections, entry point (exported component, route, view) and size. The best-connected one is the hub. Callers outside the diff become context; test files become "tested by N tests" instead of nodes.
 4. **Concepts.** Rules from `references/stacks/*.md` run on each symbol (comments and Python strings removed). Risk rules first, then one concept per function, then the rest.
 5. **Explain.** The agent reads a compact brief and writes `notes.json` (format in `references/card-format.md`).
 6. **Render.** Notes are checked against the graph, then the card, the map and the registry are written.
 
-On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the project map takes 5 seconds the first time and under one second after that.
+On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the project map takes about 5 seconds the first time and under one second after that.
 
 ## Evaluation
 
@@ -167,14 +170,16 @@ On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the pr
 - **edge recall** and **false links**: expected calls found, and edges that should not be there;
 - **wrong context**: an unchanged function drawn when it should not be (a utility used everywhere), or missing when it should be (a caller).
 
-| | v0.1 | v0.2.1 |
-|---|---|---|
-| Concept precision | 91.2% (6 invented) | 100% (0 invented) |
-| Concept recall | 100% | 100% |
-| Edge recall | 100% | 100% |
-| False links | 2 | 0 |
+48 cases: 24 written for the purpose (the examples, a few changes per stack, and traps such as a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` used in every page) and 24 real commits of [zustand](https://github.com/pmndrs/zustand), [httpx](https://github.com/encode/httpx), [postgres_dba](https://github.com/NikolayS/postgres_dba) and [jaffle-shop-classic](https://github.com/dbt-labs/jaffle-shop-classic), annotated by reading the diff before running the tool (licenses in `evals/third_party/`).
 
-18 cases: the examples, a few realistic changes per stack, and traps (a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` and `Button` used in every page). Add a case with a `before/`, an `after/` and an `expected.json`; `python3 evals/run.py --show <case>` prints what the tool sees.
+| On the same 48 cases | v0.2.1 | v0.3.0 |
+|---|---|---|
+| Concept precision | 98.9% (1 invented) | 100% (0 invented) |
+| Concept recall | 64.7% (39.3% on the real commits) | 100% |
+| Edge recall | 81.5% | 100% |
+| False links | 4 | 0 |
+
+The real commits found most of what v0.3.0 fixes (SQL with `WITH` produced nothing, wrong links through `super()` and generators), so 100% here means "fixed what this set exposed", not "done": the set keeps growing. To add a commit: `python3 evals/tools/import_case.py <repo> <sha> <name>`, fill `expected.json` from the diff, then `python3 evals/run.py --show <name>` prints what the tool sees.
 
 ## Add a stack
 
@@ -198,18 +203,18 @@ Then add a case under `evals/cases/` (or an example under `examples/` with a tes
 
 Stacks we would love to see: Vue, Svelte, Next.js server components, Django ORM, FastAPI, Go, Rust, Kotlin, Flutter.
 
-## Limits (v0.2)
+## Limits (v0.3)
 
-- Calls are resolved by name, with same-class, same-file and import hints. Dynamic calls and same-named functions in unrelated files can be missed. Methods of built-in types (`get`, `push`, `map`…) called on another object are never linked, even when the object really is one of yours.
-- Only top-level functions and methods are nodes. Nested functions are folded into their parent; classes themselves are not nodes, so a decorator on a class is not counted.
-- SQL inside Python or JavaScript strings is not parsed.
+- A method call is linked through its receiver's type only when the code states the type (annotation, constructor, attribute set from one of those). Otherwise it falls back to the name, with same-class, same-file and import hints; built-in method names (`get`, `push`, `map`…) and calls on a chain (`self.x.m()`) are then not linked at all.
+- Nested functions are folded into their parent. TypeScript interfaces and types are not nodes.
+- SQL in strings is read only when passed to a known sink or written in uppercase SQL; SQL assembled from pieces is not.
 - Concept rules are pattern-based. The evaluation set keeps them honest, but it is small.
 - The map is regenerated each time. There is no history yet.
 
 ## Roadmap
 
-- **v0.3**: optional reading of a [Graphify](https://github.com/Graphify-Labs/graphify) `graph.json` for callers outside the repo scan, classes as nodes, a larger public evaluation set.
-- **v0.4**: more stacks (Vue, Django, Go).
+- **v0.4**: optional reading of a [Graphify](https://github.com/Graphify-Labs/graphify) `graph.json` for callers outside the repo scan; more real commits in the evaluation set.
+- **v0.5**: more stacks (Vue, Django, Go).
 - **v1.0**: team mode, with a shared project registry as living onboarding documentation.
 
 ## Credits

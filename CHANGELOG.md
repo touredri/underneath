@@ -2,6 +2,29 @@
 
 All notable changes to underneath. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-16
+
+### Added
+
+- Classes are nodes. A class shows its decorators, bases and class attributes (its methods stay separate nodes), `extends` and `class A(B)` give an `inherits` edge, and `Cls()` / `new Cls()` link to the class. New concepts: `py.inheritance`, `py.abstract`, `js.class`, `js.inheritance`; `py.dataclass` now fires on the class it decorates.
+- Calls are resolved by the receiver's type when the code states it: a parameter annotation, a constructor call, a `self`/`this` attribute set from one of those, or a module-level instance. `cache.get(k)` with `cache: ReportCache` links to `ReportCache.get`, or to the method a base class provides; `super()` goes to the base class.
+- SQL inside Python and JS strings: a string passed to `execute`, `text`, `read_sql`, `query`, the `` sql`...` `` tag and the like, or written in uppercase SQL, is read as SQL. Its concepts and risks apply (a `LEFT JOIN` undone by `WHERE` in a backend function is flagged), and the tables it names get a `queries` edge.
+- History and `underneath log`: every rendered card is kept in `.underneath/history.jsonl` (locally); `log [--days N]` sums up a period in 5 lines: changes, concepts that came back, new ones, likely bugs, and the concept to look at next.
+- 24 evaluation cases from real commits of zustand, httpx, postgres_dba and jaffle-shop-classic, annotated by reading each diff, and `evals/tools/import_case.py` to add more. `evals/run.py --only/--skip`, per-case `limits`.
+
+### Changed
+
+- One tree-sitter query per file collects every node the extractors need, in C: parsing a 2,030-file repository went from 17.9 s to 10.6 s, with identical output.
+- Editing only a docstring or whole-line comments no longer marks a function modified.
+- A function copied from one that still exists is new, not moved.
+
+### Fixed
+
+- SQL statements starting with `WITH`, and statements inside `BEGIN ... COMMIT`, produced no node at all.
+- `sql.subquery` fired on a CTE body.
+- Methods called on a chain of unknown type (`self.decompressor.flush()`) or on a generator (`gen.send(x)`) were linked to project methods with the same name.
+- The comprehension rule missed `[f(x) for x in xs]`; an `async` JS function without `await` was not async.
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed
@@ -49,6 +72,7 @@ All notable changes to underneath. The format follows [Keep a Changelog](https:/
 
 - First release: `extract`, `render`, `deeper`, `known`. A 5-line card and an HTML map of the functions an agent changed, how they connect, the concepts they use and the fundamental underneath, for React/TypeScript/JavaScript, Python and SQL.
 
+[0.3.0]: https://github.com/touredri/underneath/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/touredri/underneath/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/touredri/underneath/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/touredri/underneath/releases/tag/v0.1.0

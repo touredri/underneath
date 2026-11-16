@@ -15,6 +15,8 @@ Open-source Agent Skill that helps developers keep their fundamentals while AI g
 - Test files are not drawn as nodes; they become "tested by N tests" on the function.
 - Code moved or extracted elsewhere in the diff is `moved` (dotted), never `new`.
 - **Precision before recall.** Zero invented concepts and zero false links, enforced by `evals/` in CI. When in doubt, do not link and do not detect.
+- Receiver types come only from what the code states (annotation, constructor, attribute set from one of those, module instance). No type inference beyond that; unknown chains (`self.x.m()`) and built-in method names are never linked by name.
+- Eval expectations are written from the diff, before looking at the tool's output, and never edited to match it.
 - The Stop hook answers with `hookSpecificOutput.additionalContext`, not `{"decision": "block"}` (same loop guards, but Claude Code does not show it as an error). Approved by the maintainer.
 - `map` and `gaps` budgets: card ≤ 5 lines; map ≤ 7 fundamentals × 4 concepts; gaps ≤ 5 lines.
 - Local only, no network, no telemetry. `.underneath/` writes its own `.gitignore`.
@@ -34,11 +36,13 @@ scripts/render.py             notes validation, layout, SVG/HTML, card, registry
 scripts/project.py            whole-project scan with per-file cache (map, gaps)
 scripts/render_map.py         map/gaps cards and map.html
 scripts/stop_hook.py          the Stop hook; scripts/ids.py: change_id shared with render
+scripts/history.py            .underneath/history.jsonl and `underneath log`
 references/stacks/*.md        concept catalogues (the contribution unit)
 references/fundamentals.md    fundamentals with a short example each
 references/card-format.md     notes.json schema, writing rules, config.json keys
 examples/*/before|after       fixtures, each with the notes.json an agent would write
-evals/                        cases/*/expected.json, run.py (precision, recall, false links), thresholds.json
+evals/                        cases/*/expected.json (24 synthetic, 24 real-*), run.py, thresholds.json,
+                              tools/import_case.py (commit -> case), third_party/ (licenses of real cases)
 tests/test_examples.py        end-to-end tests (includes the evals)
 .github/workflows/ci.yml      tests + evals on Linux (3.10, 3.13) and macOS
 ```
@@ -58,17 +62,16 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.2.1 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 17 tests and 18 eval cases green (100 % precision and recall, 0 false links, 0 wrong context), also on Python 3.10. Published on 2026-11-16 at https://github.com/touredri/underneath (public, `main`, tags `v0.1.0`, `v0.2.0`, `v0.2.1`, release v0.2.1); the first CI run passed on Ubuntu 3.10, 3.13 and macOS 3.13.
+v0.3.0 (2026-11-16), see CHANGELOG.md. Classes as nodes, typed receivers, SQL in strings, history and `log`, one tree-sitter query per file (parse 1.7x faster). 18 tests and 48 eval cases green: 100 % precision, recall and edge recall, 0 false links (v0.2.1 on the same set: 98.9 %, 64.7 %, 81.5 %, 4). Published at https://github.com/touredri/underneath; 0.3.0 is committed locally and waits for the maintainer's go to push and release.
 
-Known limits: name-based call resolution (same class, same file, imports as hints), and built-in method names (`get`, `push`…) on other objects are never linked; only top-level functions and methods (no class nodes); SQL inside strings not parsed; regex-based concept rules.
-
-Dogfooding frictions fixed in 0.2.1: utilities no longer take context slots; `minor` concepts rank last; likely bugs always visible on map.html.
+Known limits: types only when stated; nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL; regex-based concept rules.
 
 ## Next steps (in order)
 
-1. Watch the first real uses: install from GitHub (marketplace + `~/.underneath/venv`) was tested end to end on 0.2.1, as were the missing-dependency hint and the card at the end of a task. Release notes: GitHub releases, from CHANGELOG.md.
-2. v0.3: optional Graphify `graph.json` for callers outside the scan; classes as nodes; a larger eval set (cases from real diffs).
-3. v0.4: more stacks (Vue, Django, Go).
+1. Push 0.3.0, tag, GitHub release from the CHANGELOG, check CI, update the installed plugin (`/plugin update`).
+2. Grow the real-commit eval set (more repos, React apps, FastAPI/Django with SQL in strings) with evals/tools/import_case.py; keep expectations written from the diff.
+3. v0.4: optional Graphify `graph.json` for callers outside the scan.
+4. v0.5: more stacks (Vue, Django, Go).
 
 ## Conventions
 
