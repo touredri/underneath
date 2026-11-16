@@ -18,6 +18,7 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 - `pitfalls`: the classic mistakes, separated by `;`
 - `relates`: other concept ids it usually works with
 - `risk`: `yes` when a match is itself a likely bug; such concepts are always drawn and offered as a watch item
+- `minor`: `yes` for basics that are everywhere (list keys, event handler props); they are drawn only when nothing more telling is left
 
 ## useState
 - id: react.useState
@@ -103,6 +104,7 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 
 ## List keys
 - id: react.keys
+- minor: yes
 - detect: regex \.map\([\s\S]*?key=\{
 - fundamental: reference-equality
 - what: `key` tells React which list item is which between renders.
@@ -111,6 +113,7 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 
 ## Event handler props
 - id: react.callbackProps
+- minor: yes
 - detect: regex <[A-Z][\w.]*\b[^>]*\bon[A-Z]\w*=\{
 - fundamental: higher-order-functions
 - what: The parent passes a function to a child component; the child calls it to send information back up.

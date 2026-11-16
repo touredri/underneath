@@ -36,7 +36,7 @@ In a randomized controlled trial, Anthropic found that developers learning a new
 - **Honest about what changed.** Code moved to another file, or pulled out of a big function, is marked *moved*, not new. Tests are not drawn: they become "tested by N" on the functions they call.
 - **Likely bugs surface by themselves.** Some rules are marked `risk` (a mutable default argument in Python, a `WHERE` that undoes a `LEFT JOIN`). They are always drawn and the agent must check them.
 - **It remembers what you know.** A local registry counts the concepts you have seen. New ones get a thick border; familiar ones fade out. `/underneath gaps` lists the ones you never marked as known.
-- **Measured.** An evaluation set of 17 diffs checks that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
+- **Measured.** An evaluation set of 18 diffs checks that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
 - **Local.** No network, no telemetry. `.underneath/` ignores itself in git.
 
 ![The fundamental panel for a SQL change, dark mode](docs/map-sql-dark.png)
@@ -92,8 +92,8 @@ Work as usual. At the end of a task the agent runs the skill and shows the card.
 `/underneath map` reads every file once and groups the concepts of your code by the fundamental they rest on: one row per fundamental, its concepts most used first, each with its use count and main files. Here it is on this repository:
 
 ```
-underneath map · 88 files · 226 functions · 42 concepts on 15 fundamentals
-  top   exceptions 28 · closures 27 · iterators 27
+underneath map · 120 files · 265 functions · 42 concepts on 15 fundamentals
+  top   higher-order functions 41 · exceptions 28 · iterators 28
   ⚠     Mutable defaults ×2 · first at examples/project-map/api/app/services.py:4 (+1 other)
   gaps  42 never marked known · /underneath gaps
   map   .underneath/map.html
@@ -105,7 +105,7 @@ underneath map · 88 files · 226 functions · 42 concepts on 15 fundamentals
 
 ```
 underneath gaps · 42 of 42 concepts in your code never marked known, most used first
-  Comprehensions      23×  /underneath deeper py.comprehension
+  Comprehensions      24×  /underneath deeper py.comprehension
   Exceptions          21×  /underneath deeper py.exceptions
   async / await (py)  16×  /underneath deeper py.asyncAwait
   useState             8×  /underneath deeper react.useState
@@ -164,16 +164,17 @@ On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the pr
 
 - **concept precision**: a detected concept that is neither expected nor allowed is *invented*. The target is zero, and CI fails otherwise;
 - **concept recall**: expected concepts that were found;
-- **edge recall** and **false links**: expected calls found, and edges that should not be there.
+- **edge recall** and **false links**: expected calls found, and edges that should not be there;
+- **wrong context**: an unchanged function drawn when it should not be (a utility used everywhere), or missing when it should be (a caller).
 
-| | v0.1 | v0.2 |
+| | v0.1 | v0.2.1 |
 |---|---|---|
 | Concept precision | 91.2% (6 invented) | 100% (0 invented) |
 | Concept recall | 100% | 100% |
 | Edge recall | 100% | 100% |
 | False links | 2 | 0 |
 
-17 cases: the examples, a few realistic changes per stack, and traps (a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method). Add a case with a `before/`, an `after/` and an `expected.json`; `python3 evals/run.py --show <case>` prints what the tool sees.
+18 cases: the examples, a few realistic changes per stack, and traps (a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` and `Button` used in every page). Add a case with a `before/`, an `after/` and an `expected.json`; `python3 evals/run.py --show <case>` prints what the tool sees.
 
 ## Add a stack
 
@@ -189,7 +190,7 @@ A stack is one Markdown file in `references/stacks/`. Each concept is a section:
 - relates: react.useState, react.effectCleanup
 ```
 
-`detect` accepts `call NAME` (from the syntax tree), `regex PATTERN` (on the function's source, comments and Python strings removed) and `name PATTERN` (on the function's name). Add `requires: <id>` for concepts that only make sense together, and `risk: yes` when a match is itself a likely bug.
+`detect` accepts `call NAME` (from the syntax tree), `regex PATTERN` (on the function's source, comments and Python strings removed) and `name PATTERN` (on the function's name). Add `requires: <id>` for concepts that only make sense together, `risk: yes` when a match is itself a likely bug, and `minor: yes` for basics that are everywhere (they are drawn only when nothing more telling is left).
 
 Point `fundamental` to an entry in `references/fundamentals.md`, or add one there with a short, runnable example.
 

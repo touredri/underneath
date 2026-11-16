@@ -3,5 +3,6 @@
   "false_links_max": 0,
   "wrong_status_max": 0,
   "concept_recall_min": 0.95,
-  "edge_recall_min": 0.95
+  "edge_recall_min": 0.95,
+  "wrong_context_max": 0
 }

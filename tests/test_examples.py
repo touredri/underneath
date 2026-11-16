@@ -199,6 +199,23 @@ def test_tests_are_not_nodes():
     assert err.strip() == "", err
 
 
+def test_minor_concepts_rank_last():
+    """Basics that are everywhere (keys, event handler props) give way to concepts that say more."""
+    import graph
+    from concepts import detect, load_concepts
+    from diffscope import from_dirs
+    from parse import parse_file
+
+    cat = load_concepts(ROOT / "references")
+    case = ROOT / "evals" / "cases" / "react-memo-list"
+    g = graph.build(from_dirs(case / "before", case / "after"), cat, {})
+    shown = {c["id"] for c in g["concepts"]}
+    assert shown == {"react.memo", "react.useMemo", "react.useCallback", "react.useRef", "react.useState"}, shown
+    assert {"react.keys", "react.callbackProps"} <= set(g["summary"]["more_concept_ids"])  # still listed, one click away
+    init = parse_file("a.py", "class A:\n    def __init__(self):\n        self.x = 1\n\n    def __len__(self):\n        return 1\n")
+    assert [detect(s, cat) for s in init] == [[], ["py.dunder"]]  # a constructor is not a special-method lesson
+
+
 # ------------------------------------------------------------ map, gaps ---
 
 
@@ -250,6 +267,34 @@ def test_map_cache():
     data = json.loads((out / "map.json").read_text())
     assert data["parsed"] == 1 and data["files"] == 6
     assert data["concepts"]["react.useState"]["count"] == 3
+
+
+def test_map_always_shows_likely_bugs():
+    """A likely bug in a rarely used fundamental still gets its row, first in it, with the amber dot."""
+    from concepts import load_concepts, load_fundamentals
+    from project import by_fundamental
+    from render_map import MAP_FUNDAMENTALS, map_page
+
+    cat = load_concepts(ROOT / "references")
+    busy, seen = [], set()
+    for cid, c in cat.items():  # one concept per fundamental, used a lot, no risk
+        if not c.risk and c.fundamental not in seen and c.fundamental != "mutability":
+            busy.append(cid)
+            seen.add(c.fundamental)
+    assert len(busy) > MAP_FUNDAMENTALS
+    concepts = {cid: {"count": 50, "files": 5, "top_files": [["a.py", 50]], "places": []} for cid in busy}
+    concepts["py.mutableDefault"] = {"count": 1, "files": 1, "top_files": [["app.py", 1]], "places": ["app.py:3"]}
+    for cid in [c for c in cat if cat[c].fundamental == "closures"][:6]:  # a row with "+N more" too
+        concepts[cid] = {"count": 60, "files": 6, "top_files": [["b.py", 60]], "places": []}
+    data = {"root": "/p", "generated": "2026-11-16", "files": 10, "test_files": 0, "functions": 99, "truncated": False, "concepts": concepts}
+    groups = by_fundamental(data, cat)
+    assert groups[-1]["id"] == "mutability"  # the least used fundamental
+    page = map_page(data, groups, cat, load_fundamentals(ROOT / "references"), {}, [])
+    assert 'data-id="f:mutability"' in page
+    node = page[page.index('data-id="py.mutableDefault"'):]
+    assert '<g class="bdg">' in node[: node.index("</g></g>") + 8]
+    assert page.count('class="nd fu"') == MAP_FUNDAMENTALS  # still 7 rows
+    assert 'data-id="more:closures"' in page and 'data-id="more:fundamentals"' in page
 
 
 def test_gaps():

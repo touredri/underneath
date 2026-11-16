@@ -24,6 +24,8 @@ read write close find push shift unshift map filter reduce forEach findIndex som
 slice splice concat entries has set delete then catch finally toString trim toLowerCase toUpperCase
 startsWith endsWith json text assign
 """.split())
+UTILITY_FILES = 10  # a callee named in more files than this is a project-wide utility...
+UTILITY_WEIGHT = 0.1  # ...and weighs this much as context
 MOVE_SIMILARITY = 0.6  # below this, a same-named symbol elsewhere is a rewrite, not a move
 EXTRACT_SHARE = 0.9  # share of a new symbol's lines found in one old symbol to call it extracted
 
@@ -411,6 +413,16 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         for n in out_e[k]:
             if n not in status and not is_test(syms[n].file):
                 ctx_scores[n] += 1
+    # A callee used all over the project (`cn`, `Button`) says little about this change:
+    # it keeps a place only if nothing more specific wants it.
+    callees = {n for n in ctx_scores if not any(n in in_e[k] for k in shown) and _IDENT.fullmatch(syms[n].name)}
+    if callees:
+        spread: Counter = Counter()
+        for matches in scope.scan(rf"(?<![\w$])(?:{_alt({syms[n].name for n in callees})})(?![\w$])").values():
+            spread.update(set(matches))
+        for n in callees:
+            if spread[syms[n].name] > UTILITY_FILES:
+                ctx_scores[n] *= UTILITY_WEIGHT
     # Ties are broken by place in the code, never by set order: the same diff gives the same map.
     ranked_ctx = sorted(ctx_scores, key=lambda k: (-ctx_scores[k], syms[k].file, syms[k].start_line))
     context = ranked_ctx[: lim["context"]]
@@ -434,7 +446,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         best = min(rank_of[k] for k in concept_users[cid])
         new_to_you = seen.get(cid, {}).get("seen", 0) == 0 and not seen.get(cid, {}).get("known")
         familiar = seen.get(cid, {}).get("seen", 0) >= 10 or seen.get(cid, {}).get("known", False)
-        return (3 if new_to_you else 0) - (2 if familiar else 0) + len(concept_users[cid]) + (0.5 if catalogue[cid].requires else 0) + 1 / (1 + best) + (10 if catalogue[cid].risk else 0)
+        return (3 if new_to_you else 0) - (2 if familiar else 0) + len(concept_users[cid]) + (0.5 if catalogue[cid].requires else 0) + 1 / (1 + best) + (10 if catalogue[cid].risk else 0) - (6 if catalogue[cid].minor else 0)
 
     ranked_concepts = sorted(concept_users, key=lambda c: (-cscore(c), c))
     # Risks first, then one concept per shown symbol (in rank order), then the best of the rest.
@@ -442,7 +454,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
     for k in shown:
         if len(picked) >= lim["concepts"]:
             break
-        mine = [c for c in ranked_concepts if k in concept_users[c]]
+        mine = [c for c in ranked_concepts if k in concept_users[c] and not catalogue[c].minor]
         if mine and not any(c in picked for c in mine):
             picked.append(mine[0])
     for c in ranked_concepts:

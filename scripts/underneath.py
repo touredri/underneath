@@ -18,7 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -220,7 +220,7 @@ def cmd_map(a) -> int:
     data, catalogue, registry, out = _project(a)
     fundamentals = load_fundamentals(REF)
     groups = by_fundamental(data, catalogue)
-    gap_ids = gaps(data, registry)
+    gap_ids = gaps(data, registry, catalogue)
     (out / "map.json").write_text(json.dumps(data, indent=1), encoding="utf8")
     html_path = out / "map.html"
     html_path.write_text(map_page(data, groups, catalogue, fundamentals, registry, gap_ids), encoding="utf8")
@@ -230,7 +230,7 @@ def cmd_map(a) -> int:
 
 def cmd_gaps(a) -> int:
     data, catalogue, registry, _ = _project(a)
-    print(gaps_card(data, gaps(data, registry), catalogue))
+    print(gaps_card(data, gaps(data, registry, catalogue), catalogue))
     return 0
 
 

@@ -58,20 +58,17 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.2.0 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 15 tests and 17 eval cases green (100 % precision and recall, 0 false links), also on Python 3.10. Published on 2026-11-16 at https://github.com/touredri/underneath (public, `main`, tags `v0.1.0` and `v0.2.0`); the first CI run passed on Ubuntu 3.10, 3.13 and macOS 3.13.
+v0.2.1 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 17 tests and 18 eval cases green (100 % precision and recall, 0 false links, 0 wrong context), also on Python 3.10. Published on 2026-11-16 at https://github.com/touredri/underneath (public, `main`, tags `v0.1.0` and `v0.2.0`); the first CI run passed on Ubuntu 3.10, 3.13 and macOS 3.13.
 
 Known limits: name-based call resolution (same class, same file, imports as hints), and built-in method names (`get`, `push`…) on other objects are never linked; only top-level functions and methods (no class nodes); SQL inside strings not parsed; regex-based concept rules.
 
-Frictions seen while dogfooding and not fixed yet:
-- Context slots go to utilities called everywhere (`cn`, `Button`); prefer callers, skip high fan-in leaves.
-- Trivial concepts (Event handler props, Special methods for `__init__`) can outrank useful ones (useEffect, cleanup); weight concepts, not only count them.
+Dogfooding frictions fixed in 0.2.1: utilities no longer take context slots; `minor` concepts rank last; likely bugs always visible on map.html.
 
 ## Next steps (in order)
 
 1. Try the install from GitHub in a clean Claude Code: `/plugin marketplace add touredri/underneath`, `/plugin install underneath@underneath`, then remove the old `~/.claude/skills/underneath` symlink so the skill is not loaded twice. Create a GitHub release for v0.2.0 from the CHANGELOG.
-2. The two open frictions above, each with an eval case.
-3. v0.3: optional Graphify `graph.json` for callers outside the scan; classes as nodes; a larger eval set (cases from real diffs).
-4. v0.4: more stacks (Vue, Django, Go).
+2. v0.3: optional Graphify `graph.json` for callers outside the scan; classes as nodes; a larger eval set (cases from real diffs).
+3. v0.4: more stacks (Vue, Django, Go).
 
 ## Conventions
 

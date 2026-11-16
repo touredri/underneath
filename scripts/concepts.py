@@ -26,6 +26,7 @@ class Concept:
     pitfalls: list[str] = field(default_factory=list)
     relates: list[str] = field(default_factory=list)
     risk: bool = False
+    minor: bool = False  # everywhere and basic: drawn only when nothing more telling is left
 
 
 @dataclass
@@ -87,6 +88,8 @@ def load_concepts(ref_dir: Path) -> dict[str, Concept]:
                     c.pitfalls = [p.strip()[:1].upper() + p.strip()[1:].rstrip(".") + "." for p in val.split(";") if p.strip()]
                 elif key == "risk":
                     c.risk = val.lower() in ("yes", "true", "1")
+                elif key == "minor":
+                    c.minor = val.lower() in ("yes", "true", "1")
                 elif key == "relates" and val:
                     c.relates = [v.strip() for v in val.split(",") if v.strip()]
             if c.id:

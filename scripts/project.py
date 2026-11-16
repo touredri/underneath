@@ -133,19 +133,21 @@ def scan(scope: Scope, catalogue: dict[str, Concept], ref_dir: Path, cache_dir: 
 
 
 def by_fundamental(data: dict, catalogue: dict[str, Concept]) -> list[dict]:
-    """[{id, count, concepts: [cid, ...]}], biggest first; concepts biggest first inside."""
+    """[{id, count, concepts: [cid, ...]}], biggest first; inside, likely bugs first and minor basics last."""
     groups: dict[str, list[str]] = defaultdict(list)
     for cid in data["concepts"]:
         groups[catalogue[cid].fundamental or "other"].append(cid)
     out = []
     for fid, cids in groups.items():
-        cids.sort(key=lambda c: (-data["concepts"][c]["count"], c))
+        # Likely bugs first, `minor` basics last, the rest by use count.
+        cids.sort(key=lambda c: (not catalogue[c].risk, catalogue[c].minor, -data["concepts"][c]["count"], c))
         out.append({"id": fid, "count": sum(data["concepts"][c]["count"] for c in cids), "concepts": cids})
     out.sort(key=lambda g: (-g["count"], g["id"]))
     return out
 
 
-def gaps(data: dict, registry: dict) -> list[str]:
-    """Concepts present in the code and never marked known, most used first."""
+def gaps(data: dict, registry: dict, catalogue: dict[str, Concept] | None = None) -> list[str]:
+    """Concepts present in the code and never marked known, most used first; `minor` basics after the rest."""
     known = {cid for cid, e in registry.get("concepts", {}).items() if e.get("known")}
-    return sorted((c for c in data["concepts"] if c not in known), key=lambda c: (-data["concepts"][c]["count"], c))
+    minor = {cid for cid, c in (catalogue or {}).items() if c.minor}
+    return sorted((c for c in data["concepts"] if c not in known), key=lambda c: (c in minor, -data["concepts"][c]["count"], c))

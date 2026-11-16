@@ -2,6 +2,19 @@
 
 All notable changes to underneath. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-16
+
+### Fixed
+
+- `map.html` hid likely bugs when they rested on a rarely used fundamental: the chip said "4 likely bugs" but no amber dot was drawn. A fundamental with a likely bug now always gets its row (still 7 rows at most), and the likely bug comes first in it.
+- Context slots went to utilities used all over the project (`cn`, `Button`, `Badge`) instead of what the change depends on. A callee named in more than 10 files now weighs a tenth as much; callers still come first.
+- Basic concepts that are everywhere (event handler props, list keys, special methods) took the place of telling ones (useEffect, effect cleanup). They are now marked `minor: yes` in the stack files and drawn only when nothing more telling is left; they stay listed under "also present". A Python `__init__` alone no longer counts as a special method. In `gaps` and in each row of `map.html`, minor concepts come after the others.
+
+### Added
+
+- `evals/`: an 18th case, and a `context` check (expected and unwanted context functions) with its threshold.
+- `minor: yes` in stack files.
+
 ## [0.2.0] - 2026-11-16
 
 ### Added
@@ -36,5 +49,6 @@ All notable changes to underneath. The format follows [Keep a Changelog](https:/
 
 - First release: `extract`, `render`, `deeper`, `known`. A 5-line card and an HTML map of the functions an agent changed, how they connect, the concepts they use and the fundamental underneath, for React/TypeScript/JavaScript, Python and SQL.
 
+[0.2.1]: https://github.com/touredri/underneath/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/touredri/underneath/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/touredri/underneath/releases/tag/v0.1.0

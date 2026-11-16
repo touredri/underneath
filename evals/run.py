@@ -9,7 +9,8 @@ own `before/` and `after/` folders or a `"source"` pointing at an example.
       "source": "examples/react-search",          # optional
       "concepts": {"expected": [...], "allowed": [...]},
       "edges": {"expected": [["from", "to", "calls"], ...], "forbidden": [[...]], "complete": true},
-      "status": {"Label": "moved"}                # optional
+      "status": {"Label": "moved"},               # optional
+      "context": {"expected": [...], "forbidden": [...]}   # optional: unchanged functions drawn
     }
 
 Concepts are every concept detected on the drawn changed functions (the five
@@ -68,6 +69,12 @@ def evaluate(case: Path, catalogue) -> dict:
     if es.get("complete"):
         false_links |= {e for e in edges if e[0] in changed and e[1] in changed and e not in exp_edges}
     status = {n["label"]: n["status"] for n in g["nodes"]}
+    ctx = {n["label"] for n in g["nodes"] if n["status"] == "context"}
+    cs = spec.get("context", {})
+    wrong_context = sorted(
+        [f"missing context {c}" for c in cs.get("expected", []) if c not in ctx]
+        + [f"unwanted context {c}" for c in cs.get("forbidden", []) if c in ctx]
+    )
     return {
         "case": case.name,
         "about": spec.get("about", ""),
@@ -80,6 +87,7 @@ def evaluate(case: Path, catalogue) -> dict:
         "missing_edges": sorted(map(list, exp_edges - edges)),
         "false_links": sorted(map(list, false_links)),
         "wrong_status": sorted(f"{k}: {status.get(k)} (want {v})" for k, v in spec.get("status", {}).items() if status.get(k) != v),
+        "wrong_context": wrong_context,
     }
 
 
@@ -107,6 +115,7 @@ def summarize(results: list[dict]) -> dict:
         "edge_recall": round(e_found / e_want, 3) if e_want else 1.0,
         "false_links": sum(len(r["false_links"]) for r in results),
         "wrong_status": sum(len(r["wrong_status"]) for r in results),
+        "wrong_context": sum(len(r["wrong_context"]) for r in results),
     }
 
 
@@ -145,13 +154,13 @@ def main(argv=None) -> int:
             f"{r['case']:<{w}}  {r['concepts_found']:>8}  {len(r['invented']):>8}  {len(r['missed']):>6}  "
             f"{r['edges_found']:>2}/{r['edges_expected']:<2}  {len(r['false_links']):>11}"
         )
-        for key in ("invented", "missed", "missing_edges", "false_links", "wrong_status"):
+        for key in ("invented", "missed", "missing_edges", "false_links", "wrong_status", "wrong_context"):
             if r[key]:
                 print(f"{'':<{w}}    {key.replace('_', ' ')}: {r[key]}")
     print(
         f"\nprecision {total['concept_precision']:.1%} ({total['invented_concepts']} invented) · "
         f"recall {total['concept_recall']:.1%} · edge recall {total['edge_recall']:.1%} · "
-        f"{total['false_links']} false link(s) · {total['wrong_status']} wrong status · {total['cases']} cases"
+        f"{total['false_links']} false link(s) · {total['wrong_status']} wrong status · {total['wrong_context']} wrong context · {total['cases']} cases"
     )
     for f in fails:
         print(f"FAIL {f}")

@@ -93,24 +93,33 @@ def gaps_card(data: dict, gap_ids: list[str], catalogue: dict[str, Concept]) -> 
 # ------------------------------------------------------------------- page ---
 
 
-def _layout(groups: list[dict]) -> tuple[dict, list[tuple[str, list[str], bool]], int, int]:
-    rows = [(g["id"], g["concepts"][:MAP_PER_ROW], len(g["concepts"]) > MAP_PER_ROW) for g in groups[:MAP_FUNDAMENTALS]]
+def pick_rows(groups: list[dict], catalogue: dict[str, Concept]) -> tuple[list[dict], list[dict]]:
+    """(shown, rest): the biggest fundamentals, but a row with a likely bug is always shown."""
+    risky = [g for g in groups if any(catalogue[c].risk for c in g["concepts"])][:MAP_FUNDAMENTALS]
+    room = MAP_FUNDAMENTALS - len(risky)
+    keep = {g["id"] for g in risky} | {g["id"] for g in [g for g in groups if g not in risky][:room]}
+    return [g for g in groups if g["id"] in keep], [g for g in groups if g["id"] not in keep]
+
+
+def _layout(groups: list[dict], hidden: int) -> tuple[dict, list[tuple[str, list[str], bool]], int, int]:
+    rows = [(g["id"], g["concepts"][:MAP_PER_ROW], len(g["concepts"]) > MAP_PER_ROW) for g in groups]
     pos: dict[str, dict] = {}
     for r, (fid, cids, more) in enumerate(rows):
         y = PAD + r * ROW
         pos["f:" + fid] = {"x": PAD, "y": y + (C_H - F_H) / 2, "w": F_W, "h": F_H}
         for i, cid in enumerate(cids + (["more:" + fid] if more else [])):
             pos[cid] = {"x": PAD + F_W + 40 + i * (C_W + GAP), "y": y, "w": C_W, "h": C_H}
-    if len(groups) > MAP_FUNDAMENTALS:
+    if hidden:
         pos["more:fundamentals"] = {"x": PAD, "y": PAD + len(rows) * ROW, "w": F_W, "h": F_H}
     width = PAD * 2 + F_W + 40 + (MAP_PER_ROW + 1) * (C_W + GAP)
-    height = PAD * 2 + (len(rows) + (1 if len(groups) > MAP_FUNDAMENTALS else 0)) * ROW
+    height = PAD * 2 + (len(rows) + (1 if hidden else 0)) * ROW
     return pos, rows, width, max(height, 120)
 
 
 def map_page(data: dict, groups: list[dict], catalogue: dict[str, Concept], fundamentals: dict[str, Fundamental], registry: dict, gap_ids: list[str]) -> str:
     e = html.escape
-    pos, rows, width, height = _layout(groups)
+    shown, rest = pick_rows(groups, catalogue)
+    pos, rows, width, height = _layout(shown, len(rest))
     parts = [
         f'<svg viewBox="0 0 {width} {height}" width="{width}" role="img" aria-label="Concepts of the project grouped by the fundamental they rest on">'
     ]
@@ -146,11 +155,10 @@ def map_page(data: dict, groups: list[dict], catalogue: dict[str, Concept], fund
                 "list": ["Main files: " + ", ".join(f"{rel} ({n})" for rel, n in info["top_files"])],
             }
         if more:
-            rest = g["concepts"][MAP_PER_ROW:]
-            parts.append(_node_svg("more:" + fid, pos["more:" + fid], f"+{len(rest)} more", "on this fundamental", "fn-more"))
-            items["more:" + fid] = {"label": f"+{len(rest)} more", "loc": _label(fid, fundamentals), "text": "", "users": rest}
-    if "more:fundamentals" in pos:
-        rest = groups[MAP_FUNDAMENTALS:]
+            extra = g["concepts"][MAP_PER_ROW:]
+            parts.append(_node_svg("more:" + fid, pos["more:" + fid], f"+{len(extra)} more", "on this fundamental", "fn-more"))
+            items["more:" + fid] = {"label": f"+{len(extra)} more", "loc": _label(fid, fundamentals), "text": "", "users": extra}
+    if rest:
         parts.append(_node_svg("more:fundamentals", pos["more:fundamentals"], f"+{len(rest)} fundamentals", "used less", "fn-more"))
         items["more:fundamentals"] = {
             "label": f"+{len(rest)} fundamentals",

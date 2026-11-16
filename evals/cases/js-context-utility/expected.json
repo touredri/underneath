@@ -1,0 +1,6 @@
+{
+  "about": "Context goes to the caller and the change's own helpers, not to cn/Button/Badge used in 12 pages",
+  "concepts": {"expected": ["react.callbackProps"]},
+  "edges": {"expected": [["OrdersPage", "OrderSummary", "renders"], ["OrderSummary", "formatTotal", "calls"], ["OrderSummary", "discountLabel", "calls"]]},
+  "context": {"expected": ["OrdersPage", "formatTotal", "discountLabel"], "forbidden": ["cn", "Button", "Badge"]}
+}

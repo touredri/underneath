@@ -91,7 +91,8 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 
 ## Special methods
 - id: py.dunder
-- detect: name ^__\w+__$
+- detect: name ^__(?!init__$)\w+__$
+- minor: yes
 - fundamental: object-model
 - what: Methods like `__len__`, `__eq__`, `__iter__` let your objects work with built-in syntax and functions.
 - pitfalls: Defining `__eq__` without `__hash__` makes instances unhashable.
