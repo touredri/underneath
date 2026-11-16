@@ -197,8 +197,7 @@ def neighbour_files(scope: Scope, changed: list[Symbol], suffixes: dict[str, lis
     # SQL: names are case-insensitive and SQL repos are small; take every file that mentions one.
     sql = {s.name.split(".")[-1].lower() for s in changed if s.lang == "sql"}
     for s in changed:
-        if s.lang == "sql":
-            sql.update(r.split(".")[-1].lower() for r in s.refs)
+        sql.update(r.split(".")[-1].lower() for r in s.refs)  # SQL files, and SQL inside strings
     if sql:
         out |= {f for f in scope.scan(rf"(?i)\b(?:{_alt(sql)})\b") if f.endswith(".sql")}
 
@@ -392,6 +391,12 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             t = resolve(s, name)
             if t is not None and t.kind == "class":
                 edges.add((s.key, t.key, "inherits"))
+        if s.lang != "sql":  # SQL in a Python or JS string: link to the tables and views it names
+            for name in set(s.refs):
+                tables = [c for c in by_name.get(name, []) if c.lang == "sql" and c.kind in ("table", "view")]
+                if len(tables) == 1:
+                    edges.add((s.key, tables[0].key, "queries"))
+            continue
         for name in set(s.refs):
             t = resolve(s, name)
             if t is not None:

@@ -1,0 +1,5 @@
+{
+  "about": "SQL in a postgres.js sql`...` tag is read; a template string that merely sounds like SQL is not",
+  "concepts": {"expected": ["sql.innerJoin", "js.asyncAwait"], "allowed": []},
+  "edges": {"expected": [["lateOrders", "orders", "queries"], ["lateOrders", "users", "queries"]], "complete": true}
+}

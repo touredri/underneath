@@ -176,6 +176,7 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 ## async / await
 - id: js.asyncAwait
 - detect: regex \bawait\b
+- detect: regex \basync\s+(function\b|\(|[\w$]+\s*=>)
 - fundamental: promises
 - what: Writes promise-based code as if it were sequential.
 - pitfalls: Awaiting in a loop when the calls could run in parallel; forgetting `try/catch` around awaited calls.

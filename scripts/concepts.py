@@ -150,6 +150,12 @@ def detect(symbol: Symbol, catalogue: dict[str, Concept]) -> list[str]:
         )
         if hit:
             found.append(c.id)
+    # SQL written in a Python or JS string: the SQL rules run on it.
+    if symbol.embedded_sql and family != "sql":
+        sql = _strip_comments("\n;\n".join(symbol.embedded_sql), "sql")
+        for c in catalogue.values():
+            if "sql" in c.langs and c.id not in found and any(rx.search(sql) for rx in c.regexes):
+                found.append(c.id)
     # `requires` is checked after everything else is known.
     present = set(found)
     return [cid for cid in found if all(r in present for r in catalogue[cid].requires)]

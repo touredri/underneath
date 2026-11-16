@@ -1,0 +1,5 @@
+{
+  "about": "SQL inside Python strings: concepts and the LEFT JOIN risk apply, tables are linked; plain sentences are not SQL",
+  "concepts": {"expected": ["sql.outerJoin", "sql.leftJoinWhere", "sql.aggregation", "sql.null", "py.comprehension"]},
+  "edges": {"expected": [["paid_totals", "users", "queries"], ["paid_totals", "orders", "queries"], ["user_by_email", "users", "queries"]]}
+}

@@ -66,7 +66,8 @@ class Symbol:
     decorators: list[str] = field(default_factory=list)
     member_only: list[str] = field(default_factory=list)
     bases: list[str] = field(default_factory=list)  # classes only: what it extends
-    typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known  # names only ever called as `other.name()`, never bare or on self/this
+    typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known
+    embedded_sql: list[str] = field(default_factory=list)  # SQL written in this function's strings  # names only ever called as `other.name()`, never bare or on self/this
     exported: bool = False
     entry: bool = False
     label: str = ""
@@ -230,6 +231,56 @@ def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]
     return out
 
 
+# ------------------------------------------------------------ SQL strings ---
+# SQL inside Python or JS strings: passed to a known sink and shaped like SQL,
+# or written in uppercase SQL. "Select an option from the list" is neither.
+
+_SQL_SINKS = {
+    "execute", "executemany", "executescript", "text", "read_sql", "read_sql_query", "exec_driver_sql", "raw",
+    "query", "fetch", "fetchrow", "fetchval", "fetchall", "mogrify", "unsafe", "sql", "prepare", "run", "all", "get",
+}
+_SQL_START = re.compile(r"(?is)^\s*(select|with|insert\s+into|update|delete\s+from|create|alter|drop)\b.*\b(from|into|set|values|table|index|view|as)\b")
+_SQL_UPPER = re.compile(r"(?s)^\s*(SELECT|WITH|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b.*\b(FROM|INTO|SET|VALUES)\b")
+
+
+def _string_value(node, src) -> str:
+    raw = _text(node, src)
+    body = re.sub(r"^[rbfuRBFU]{0,2}(\"\"\"|\'\'\'|\"|\'|`)", "", raw)
+    body = re.sub(r"(\"\"\"|\'\'\'|\"|\'|`)$", "", body)
+    return re.sub(r"\$\{[^}]*\}|\{[^}]*\}", "?", body)  # f-string and template placeholders
+
+
+def _embedded_sql(node, src) -> list[str]:
+    out = []
+    for n in _walk(node):
+        if n.type not in ("string", "template_string"):
+            continue
+        text = _string_value(n, src)
+        sink = False
+        p = n.parent
+        if p is not None and p.type == "call_expression" and n.type == "template_string":  # sql`SELECT ...`
+            fn = p.child_by_field_name("function")
+            sink = fn is not None and _text(fn, src).split(".")[-1] == "sql"
+        elif p is not None and p.type in ("argument_list", "arguments") and p.named_children and p.named_children[0] == n:
+            call = p.parent
+            fn = call.child_by_field_name("function") if call is not None else None
+            if fn is not None:
+                name = _text(fn, src).split(".")[-1]
+                sink = name in _SQL_SINKS
+        if (sink and _SQL_START.match(text)) or _SQL_UPPER.match(text):
+            out.append(text)
+    return out
+
+
+def _sql_refs(texts: list[str]) -> list[str]:
+    """Tables and views a list of SQL strings names, read with the SQL grammar."""
+    refs = []
+    for text in texts:
+        tree = _parser("sql").parse(text.encode("utf8"))
+        refs += [_sql_ident(n, text.encode("utf8")) for n in _walk(tree.root_node) if n.type == "object_reference"]
+    return sorted(set(r for r in refs if r))
+
+
 # ---------------------------------------------------------------- JS / TS ---
 
 _JS_FUNC_VALUES = {"arrow_function", "function_expression", "function", "generator_function"}
@@ -325,6 +376,7 @@ def _parse_js(path, src, lang):
         source = _text(src_node, src)
         calls, renders, direct = _js_calls(node, src)
         env, attrs = _js_env(_js_fn(node), src, module_env)
+        sql = _embedded_sql(node, src)
         if kind == "method":
             attrs = {**class_attrs.get(qual.split(".")[0], {}), **attrs}
         k = kind or _js_kind(name, node)
@@ -343,6 +395,8 @@ def _parse_js(path, src, lang):
                 renders=renders,
                 member_only=_member_only(calls, direct),
                 typed_calls=_typed_calls(node, src, env, attrs, "js"),
+                embedded_sql=sql,
+                refs=_sql_refs(sql),
                 exported=exported,
                 entry=exported and k == "component",
             )
@@ -489,6 +543,7 @@ def _parse_py(path, src, lang):
         source = _text(outer, src)
         calls, direct = _py_calls(defn, src)
         env, attrs = _py_env(defn, src, module_env)
+        sql = _embedded_sql(defn, src)
         if cls:
             attrs = {**class_attrs.get(cls, {}), **attrs}
         out.append(
@@ -505,6 +560,8 @@ def _parse_py(path, src, lang):
                 calls=calls,
                 member_only=_member_only(calls, direct),
                 typed_calls=_typed_calls(defn, src, env, attrs, "python"),
+                embedded_sql=sql,
+                refs=_sql_refs(sql),
                 decorators=decorators(outer),
                 exported=not name.startswith("_") or (name.startswith("__") and name.endswith("__")),
                 entry=bool(_ROUTE.search(source)) or name == "main",
