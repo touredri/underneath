@@ -22,7 +22,7 @@ get items keys values append extend insert pop remove clear copy update setdefau
 index count join split strip lstrip rstrip replace lower upper startswith endswith format encode decode
 read write close find push shift unshift map filter reduce forEach findIndex some every includes indexOf
 slice splice concat entries has set delete then catch finally toString trim toLowerCase toUpperCase
-startsWith endsWith json text assign
+startsWith endsWith json text assign send throw next
 """.split())
 UTILITY_FILES = 10  # a callee named in more files than this is a project-wide utility...
 UTILITY_WEIGHT = 0.1  # ...and weighs this much as context
@@ -37,6 +37,19 @@ def is_test(path: str) -> bool:
 
 
 _EXPORT = re.compile(r"^\s*export\s+(?:default\s+)?")
+_DOC = {
+    "python": [re.compile(r'(?m)^[ \t]*[rRuU]?("""|\'\'\')[\s\S]*?\1[ \t]*$'), re.compile(r"(?m)^[ \t]*#.*$")],
+    "sql": [re.compile(r"(?m)^[ \t]*--.*$"), re.compile(r"/\*[\s\S]*?\*/")],
+}
+_JS_DOC = [re.compile(r"(?m)^[ \t]*//.*$"), re.compile(r"(?m)^[ \t]*/\*[\s\S]*?\*/")]
+
+
+def _code(s: Symbol) -> str:
+    """The source without docstrings and whole-line comments: editing only those is not a code change."""
+    text = s.source
+    for rx in _DOC.get(s.lang, _JS_DOC):
+        text = rx.sub("", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _similarity(a: Symbol, b: Symbol) -> float:
@@ -268,7 +281,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             if o is None:
                 status[s.key] = "new"
                 added[s.key] = len([l for l in s.source.splitlines() if l.strip()])
-            elif o.norm() != s.norm():
+            elif _code(o) != _code(s):
                 status[s.key] = "modified"
                 added[s.key] = _added_lines(o.source, s.source)
     gone = {k: o for k, o in old_syms.items() if k not in syms and o.file in scope.changed}
@@ -280,7 +293,9 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
     # - same name, gone from its old place, mostly the same body: moved (or moved and edited);
     # - otherwise, nearly all its lines were already in one old symbol: extracted from it.
     moved_from: dict[str, str] = {}
-    old_lines = {k: _line_bag(o.source) for k, o in old_syms.items() if o.file in scope.changed}
+    # Only code that left its old place can have moved: a copy of an unchanged function is new code.
+    old_lines = {k: _line_bag(o.source) for k, o in old_syms.items()
+                 if o.file in scope.changed and (k not in syms or status.get(k) == "modified")}
     for k in [k for k, v in status.items() if v == "new"]:
         s = syms[k]
         fam = s.lang == "python"
@@ -375,6 +390,8 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         guess = set(s.member_only) & COMMON_METHODS
         # A typed receiver whose class is not ours (`session: requests.Session`) links nothing by name either.
         guess |= typed & set(s.member_only)
+        # `self.decompressor.flush()`: an object of unknown type, so no guess by name either.
+        guess |= set(s.chained)
         for name in set(s.calls) - guess:
             t = resolve(s, name)
             if t is not None:

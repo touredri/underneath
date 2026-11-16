@@ -60,7 +60,7 @@ Same format as `react.md`. Rules run on each statement's text, case-insensitivel
 
 ## Subqueries
 - id: sql.subquery
-- detect: regex \(\s*SELECT\b
+- detect: regex (?<!\bAS\s)(?<!\bAS)\(\s*SELECT\b
 - fundamental: set-theory
 - what: A query inside another query, used as a value, a list or a table.
 - pitfalls: A correlated subquery runs once per outer row and can be very slow; `NOT IN` with a NULL in the list returns nothing.

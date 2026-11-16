@@ -66,7 +66,8 @@ class Symbol:
     renders: list[str] = field(default_factory=list)
     refs: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
-    member_only: list[str] = field(default_factory=list)
+    member_only: list[str] = field(default_factory=list)  # names only called as `other.name()`, never bare or on self/this
+    chained: list[str] = field(default_factory=list)  # names only called on `a.b.name()` / `self.x.name()` / `f().name()`
     bases: list[str] = field(default_factory=list)  # classes only: what it extends
     typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known
     embedded_sql: list[str] = field(default_factory=list)  # SQL written in this function's strings  # names only ever called as `other.name()`, never bare or on self/this
@@ -271,7 +272,9 @@ def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]
         if obj is None or meth is None:
             continue
         t = None
-        if obj.type == "identifier":
+        if obj.type == "super" or _text(obj, src) == "super()":
+            t = attrs.get("__super__", "object")  # the base class; `object` links nothing
+        elif obj.type == "identifier":
             t = env.get(_text(obj, src))
         elif obj.type in ("attribute", "member_expression"):
             inner = obj.child_by_field_name("object")
@@ -345,6 +348,25 @@ def _member_only(calls: list[str], direct: set[str]) -> list[str]:
     return sorted(set(calls) - direct)
 
 
+def _chained(node, src) -> list[str]:
+    """Methods called only on a chain (`self.x.m()`, `a.b.m()`, `f().m()`): never a module function."""
+    chain, plain = set(), set()
+    for n in _nodes(node, ("call", "call_expression")):
+        fn = n.child_by_field_name("function")
+        if fn is None:
+            continue
+        if fn.type in ("attribute", "member_expression"):
+            obj = fn.child_by_field_name("object")
+            meth = fn.child_by_field_name("attribute" if fn.type == "attribute" else "property")
+            if meth is None:
+                continue
+            on_chain = obj is not None and obj.type not in ("identifier", "this", "super") and _text(obj, src) != "super()"
+            (chain if on_chain else plain).add(_text(meth, src))
+        elif fn.type == "identifier":
+            plain.add(_text(fn, src))
+    return sorted(chain - plain)
+
+
 def _js_calls(node, src):
     calls, renders, direct = [], [], set()
     for n in _nodes(node, ("call_expression", "new_expression", "jsx_opening_element", "jsx_self_closing_element")):
@@ -360,7 +382,7 @@ def _js_calls(node, src):
                 obj = fn.child_by_field_name("object")
                 if prop is not None:
                     calls.append(_text(prop, src))
-                    if obj is not None and obj.type in ("this", "super"):
+                    if obj is not None and obj.type == "this":  # super.x() goes through the base class
                         direct.add(calls[-1])
         elif n.type == "new_expression":
             ctor = n.child_by_field_name("constructor")
@@ -447,6 +469,7 @@ def _parse_js(path, src, lang):
                 calls=calls,
                 renders=renders,
                 member_only=_member_only(calls, direct),
+                chained=_chained(node, src),
                 typed_calls=_typed_calls(node, src, env, attrs, "js"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
@@ -471,6 +494,7 @@ def _parse_js(path, src, lang):
                     attrs[_text(nm, src)] = t
             elif m.type == "method_definition":
                 attrs.update(_js_env(m, src, module_env)[1])
+        attrs["__super__"] = bases[0].split(".")[-1] if bases else "Object"
         class_attrs[cname] = attrs
         calls, direct = [], set()
         for m in body.named_children if body is not None else []:
@@ -557,7 +581,7 @@ def _py_calls(node, src):
                 if a is not None:
                     calls.append(_text(a, src))
                     receiver = _text(obj, src) if obj is not None else ""
-                    if receiver in _OWN or receiver == "super()":
+                    if receiver in _OWN:  # super().x() is resolved through the base class, not by name
                         direct.add(calls[-1])
     return calls, direct
 
@@ -613,6 +637,7 @@ def _parse_py(path, src, lang):
                 signature=_signature(source),
                 calls=calls,
                 member_only=_member_only(calls, direct),
+                chained=_chained(defn, src),
                 typed_calls=_typed_calls(defn, src, env, attrs, "python"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
@@ -644,7 +669,6 @@ def _parse_py(path, src, lang):
             c, d = _py_calls(m, src)
             calls += c
             direct |= d
-        class_attrs[cname] = attrs
         bases = []
         sup = defn.child_by_field_name("superclasses")
         for a in sup.named_children if sup is not None else []:
@@ -652,6 +676,8 @@ def _parse_py(path, src, lang):
                 name = _text(a, src).split(".")[-1]
                 if name != "object":
                     bases.append(name)
+        attrs["__super__"] = bases[0] if bases else "object"
+        class_attrs[cname] = attrs
         source = head.rstrip() + ("\n    " + "\n    ".join(own) if own else "\n    ...")
         out.append(
             Symbol(
@@ -713,21 +739,30 @@ def _parse_sql(path, src, lang):
     tree = _parser(lang).parse(src)
     _use_index(tree, lang)
     out: list[Symbol] = []
-    for stmt in tree.root_node.named_children:
-        if stmt.type != "statement" or not stmt.named_children:
+    def statements(nodes, in_tx=False):
+        for n in nodes:
+            if n.type == "transaction":  # BEGIN; ...; COMMIT;
+                yield from statements(n.named_children, True)
+            elif n.type == "statement" and n.named_children:
+                yield n, in_tx
+
+    for stmt, in_tx in statements(tree.root_node.named_children):
+        # `WITH x AS (...) SELECT ...` starts with keyword_with and the CTEs: the kind is the first statement node.
+        body = next((c for c in stmt.named_children if c.type in _SQL_KINDS), None)
+        if body is None:
             continue
-        body = stmt.named_children[0]
-        kind = _SQL_KINDS.get(body.type)
-        if kind is None:
-            continue
+        kind = _SQL_KINDS[body.type]
         source = _text(stmt, src)
+        if in_tx:
+            source = f"BEGIN;\n{source};\nCOMMIT;"  # it runs inside the transaction
         refs = []
         name = None
+        ctes = {_sql_ident(c.named_children[0], src) for c in stmt.named_children if c.type == "cte" and c.named_children}
         if body.type == "create_index":
             ident = next((c for c in body.named_children if c.type == "identifier"), None)
             name = _sql_ident(ident, src) if ident is not None else None
-        for n in _nodes(body, ("object_reference",)):
-            if n.type == "object_reference":
+        for n in _nodes(stmt if ctes else body, ("object_reference",)):
+            if n.type == "object_reference" and _sql_ident(n, src) not in ctes:
                 refs.append(_sql_ident(n, src))
         if kind in _SQL_NAMED and kind != "index" and refs:
             name = refs[0]
