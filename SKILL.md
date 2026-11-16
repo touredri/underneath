@@ -19,9 +19,9 @@ You do not decide what is in the map. The syntax tree does. You only explain.
 
 `SKILL_DIR` below is the folder that contains this file.
 
-1. **Check the dependency** (first run only):
-   `python3 -c "import tree_sitter_language_pack"` and, if it fails,
-   `pip install -r SKILL_DIR/requirements.txt`.
+1. **Check the dependency** (first run only): `python3 SKILL_DIR/scripts/underneath.py deeper closures`.
+   If it says tree-sitter is missing, install it in a virtualenv next to the skill (the script uses it by itself):
+   `python3 -m venv SKILL_DIR/.venv && SKILL_DIR/.venv/bin/pip install -r SKILL_DIR/requirements.txt`.
 
 2. **Extract**, from the project root:
    ```

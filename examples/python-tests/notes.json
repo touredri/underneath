@@ -1,0 +1,20 @@
+{
+  "nodes": {
+    "n1": {
+      "summary": "Subtracts a whole-number percentage, rejecting anything outside 0 to 100."
+    },
+    "n2": {
+      "summary": "Sums price times quantity, then hands the result to apply_discount."
+    }
+  },
+  "concepts": {
+    "py.exceptions": {
+      "here": "apply_discount raises ValueError for an out-of-range percent instead of returning a wrong price."
+    }
+  },
+  "watch": [],
+  "fundamental": {
+    "id": "exceptions",
+    "text": "A bad discount stops the call at raise; total never returns a price computed from it."
+  }
+}

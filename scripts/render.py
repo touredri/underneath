@@ -262,7 +262,7 @@ def svg(graph: dict, notes: dict, lay: dict) -> str:
     for n in graph["nodes"]:
         sub = n["kind"].replace("_", " ")
         sub = f"hub · {n['status']}" if n["hub"] else f"{sub} · {n['status']}"
-        cls = {"new": "fn-new", "modified": "fn-mod", "context": "fn-ctx ctx"}[n["status"]]
+        cls = {"new": "fn-new", "modified": "fn-mod", "moved": "fn-mov", "context": "fn-ctx ctx"}[n["status"]]
         if n["hub"]:
             cls += " hub"
         parts.append(_node_svg(n["id"], pos[n["id"]], n["label"], sub, cls, n["id"] in watched))
@@ -282,17 +282,27 @@ def svg(graph: dict, notes: dict, lay: dict) -> str:
 # ------------------------------------------------------------------ card ---
 
 
+def counts(s: dict) -> list[str]:
+    """`2 new · 1 modified · 30 moved · 1 removed · 3 tests`, zeros left out (but never empty)."""
+    out = [f"{s['new']} new"] if s["new"] or not (s["modified"] or s.get("moved")) else []
+    if s["modified"]:
+        out.append(f"{s['modified']} modified")
+    if s.get("moved"):
+        out.append(f"{s['moved']} moved")
+    if s["removed"]:
+        out.append(f"{len(s['removed'])} removed")
+    if s.get("tests"):
+        out.append(f"{s['tests']} test{'s' if s['tests'] > 1 else ''}")
+    return out
+
+
 def card(graph: dict, notes: dict, html_path: str) -> str:
     s = graph["summary"]
     nodes = graph["nodes"]
     by_id = {n["id"]: n for n in nodes}
     new_concepts = [c["label"] for c in graph["concepts"] if c["new_to_you"]]
     head = ["underneath"]
-    head.append(f"{s['new']} new")
-    if s["modified"]:
-        head.append(f"{s['modified']} modified")
-    if s["removed"]:
-        head.append(f"{len(s['removed'])} removed")
+    head += counts(s)
     if new_concepts:
         head.append(f"{len(new_concepts)} new concept{'s' if len(new_concepts) > 1 else ''}")
     if notes["watch"]:
@@ -345,6 +355,7 @@ header .sp{flex:1}button{font:inherit;font-size:13px;background:transparent;colo
 svg{display:block;max-width:100%;height:auto;margin:0 auto}
 .nd{cursor:pointer}.nd rect{stroke-width:1}.nd .t{font-size:13px;font-weight:600;text-anchor:middle;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.nd .s{font-size:11px;text-anchor:middle}
 .fn-new rect,.fn-mod rect{fill:var(--pn-f);stroke:var(--pn-s)}.fn-new text,.fn-mod text{fill:var(--pn-t)}.fn-mod rect{stroke-dasharray:5 3}
+.fn-mov rect{fill:var(--pn-f);stroke:var(--pn-s);stroke-dasharray:1 3;opacity:.7}.fn-mov text{fill:var(--pn-t)}
 .fn-ctx rect,.fn-more rect{fill:var(--ct-f);stroke:var(--ct-s)}.fn-ctx text,.fn-more text{fill:var(--ct-t)}.fn-more rect{stroke-dasharray:3 3}
 .hub>rect{stroke-width:2.5}.bdg circle{fill:var(--wa)}.bdg text{fill:#fff;font-size:11px;font-weight:700;text-anchor:middle}
 .co>rect{fill:var(--co-f);stroke:var(--co-s)}.co text{fill:var(--co-t)}.co-new>rect{stroke-width:2.5}
@@ -416,7 +427,9 @@ def build_items(graph: dict, notes: dict, fundamentals: dict[str, Fundamental]) 
         summary = notes["nodes"].get(n["id"], {}).get("summary")
         items[n["id"]] = {
             "label": n["label"],
-            "loc": f"{n['file']}:{n['line']} · {n['kind'].replace('_', ' ')} · {n['status']}" + (" · hub" if n["hub"] else ""),
+            "loc": f"{n['file']}:{n['line']} · {n['kind'].replace('_', ' ')} · {n['status']}"
+            + (f" from {n['moved_from']}" if n.get("moved_from") else "")
+            + (" · hub" if n["hub"] else ""),
             "href": f"vscode://file/{root}/{n['file']}:{n['line']}",
             "text": summary or n["signature"],
             "watch": watch.get(n["id"], []),
@@ -466,11 +479,10 @@ def page(graph: dict, notes: dict, fundamentals: dict[str, Fundamental]) -> str:
     hub = next((n["id"] for n in graph["nodes"] if n["hub"]), None)
     start = hub or next((n["id"] for n in graph["nodes"] if n["status"] != "context"), None) or next(iter(items), "")
     new_c = sum(1 for c in graph["concepts"] if c["new_to_you"])
-    chips = [f'<span class="chip n">{s["new"]} new</span>']
-    if s["modified"]:
-        chips.append(f'<span class="chip">{s["modified"]} modified</span>')
-    if s["removed"]:
-        chips.append(f'<span class="chip" title="{html.escape(", ".join(s["removed"]))}">{len(s["removed"])} removed</span>')
+    chips = []
+    for i, c in enumerate(counts(s)):
+        tip = f' title="{html.escape(", ".join(s["removed"]))}"' if c.endswith("removed") else ""
+        chips.append(f'<span class="chip{" n" if i == 0 else ""}"{tip}>{html.escape(c)}</span>')
     if new_c:
         chips.append(f'<span class="chip c">{new_c} new concept{"s" if new_c > 1 else ""}</span>')
     if notes["watch"]:
@@ -485,7 +497,7 @@ def page(graph: dict, notes: dict, fundamentals: dict[str, Fundamental]) -> str:
 <body><main>
 <header><h1>underneath</h1>{''.join(chips)}<span class="sp"></span><button id="toggle">New only</button></header>
 <div class="wrap">{svg(graph, notes, lay)}</div>
-<div class="legend">Solid line: read from the code. Purple dashed: inferred by the agent. Purple: changed function (dashed border = modified). Teal: concept (thick border = new to you). Gray: context. Amber dot: something to watch.{more}</div>
+<div class="legend">Solid line: read from the code. Purple dashed: inferred by the agent. Purple: changed function (dashed border = modified, dotted = moved). Teal: concept (thick border = new to you). Gray: context. Amber dot: something to watch.{more}</div>
 <section id="panel" aria-live="polite"></section>
 <footer>{html.escape(graph['root'])} · compared with {html.escape(graph['base'])} · {len(s['files'])} file(s), +{s['added_lines']} lines · {date.today().isoformat()}</footer>
 </main>

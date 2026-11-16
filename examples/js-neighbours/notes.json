@@ -1,0 +1,7 @@
+{
+  "nodes": {
+    "n1": {"summary": "Returns a new cart with the item appended, the total recomputed and a formatted price label."},
+    "n2": {"summary": "Now starts the checkout with a first item already in the cart."}
+  },
+  "watch": []
+}

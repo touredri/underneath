@@ -12,16 +12,38 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+
+def _use_skill_venv() -> None:
+    """Re-run under <skill>/.venv when the system Python lacks tree-sitter.
+
+    macOS and recent Linux distributions refuse `pip install` into the system
+    Python, so the dependencies usually live in a virtualenv next to the skill.
+    """
+    try:
+        import tree_sitter_language_pack  # noqa: F401
+        return
+    except ImportError:
+        pass
+    venv = HERE.parent / ".venv"
+    venv_py = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if venv_py.exists() and Path(sys.prefix).resolve() != venv.resolve():
+        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
+    # Otherwise parse.py explains how to install.
+
+
+_use_skill_venv()
+
 from concepts import load_concepts, load_fundamentals  # noqa: E402
 from diffscope import from_dirs, from_git  # noqa: E402
 from graph import LIMITS, build  # noqa: E402
-from render import card, clean_notes, page, update_registry  # noqa: E402
+from render import card, clean_notes, counts, page, update_registry  # noqa: E402
 
 REF = HERE.parent / "references"
 MAX_SNIPPET = 40
@@ -75,9 +97,8 @@ def cmd_extract(a) -> int:
         print(f"underneath: small change (+{s['added_lines']} lines, nothing new). Skip the card.")
         return 0
 
-    removed = f", {len(s['removed'])} removed" if s["removed"] else ""
     lines = [
-        f"underneath extract · {s['new']} new, {s['modified']} modified{removed} · compared with {scope.base_label}",
+        f"underneath extract · {', '.join(counts(s))} · compared with {scope.base_label}",
         f"graph: {out / 'graph.json'}",
         "",
         "NODES (ids are fixed; write a summary only for changed ones)",
@@ -90,7 +111,7 @@ def cmd_extract(a) -> int:
             rel_in.setdefault((e["to"], e["type"]), []).append(e["from"])
     passive = {"calls": "called by", "renders": "rendered by", "reads": "read by", "references": "referenced by", "indexes": "indexed by", "decorated by": "decorates"}
     for n in g["nodes"]:
-        tag = f"{n['kind'].replace('_', ' ')} · {n['status']}" + (" · hub" if n["hub"] else "")
+        tag = f"{n['kind'].replace('_', ' ')} · {n['status']}" + (f" from {n['moved_from']}" if n.get("moved_from") else "") + (" · hub" if n["hub"] else "")
         lines.append(f"{n['id']:<4}{n['label']}  [{tag}]  {n['file']}:{n['line']}-{n['end_line']}")
         if n["concepts"]:
             lines.append(f"    concepts: {', '.join(n['concepts'])}")
@@ -130,7 +151,7 @@ def cmd_extract(a) -> int:
         f"FUNDAMENTAL candidates: {', '.join(g['fundamental_candidates']) or 'none'}",
         "",
         f"NEXT: write {out / 'notes.json'} (format: references/card-format.md), then run:",
-        f"  python {HERE / 'underneath.py'} render" + (f" --out {out}" if a.out or a.before else ""),
+        f"  python3 {HERE / 'underneath.py'} render" + (f" --out {out}" if a.out or a.before else ""),
     ]
     print("\n".join(lines))
     return 0

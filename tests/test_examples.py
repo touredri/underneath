@@ -1,8 +1,9 @@
-"""End-to-end checks on the three examples. Run with `python tests/test_examples.py` or pytest."""
+"""End-to-end checks on the examples. Run with `python tests/test_examples.py` or pytest."""
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -85,6 +86,113 @@ def test_notes_are_validated():
     for bit in ("n99", "react.useImaginary", "n42", "'n6'", "quantum-physics"):
         assert bit in c.stderr, bit
     assert "⚠" not in c.stdout
+
+
+# ----------------------------------------------------- v0.2 dogfood fixes ---
+
+sys.path.insert(0, str(ROOT / "scripts"))
+
+
+def _git_scope(example: str):
+    """A throwaway git repo: `before` committed, `after` in the working tree."""
+    from diffscope import from_git
+
+    repo = Path(tempfile.mkdtemp(prefix=f"underneath-git-{example}-"))
+    shutil.copytree(EX / example / "before", repo, dirs_exist_ok=True)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
+    subprocess.run([*git, "init", "-q"], cwd=repo, check=True)
+    subprocess.run([*git, "add", "-A"], cwd=repo, check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "before"], cwd=repo, check=True)
+    for p in repo.iterdir():
+        if p.name != ".git":
+            shutil.rmtree(p) if p.is_dir() else p.unlink()
+    shutil.copytree(EX / example / "after", repo, dirs_exist_ok=True)
+    return from_git(repo, "HEAD")
+
+
+def _full_parse_graph(scope):
+    """The graph as v0.1 built it: every file of the universe parsed."""
+    import graph
+    from concepts import load_concepts
+
+    saved = graph.neighbour_files
+    graph.neighbour_files = lambda sc, changed, suffixes: set(sc.universe) - set(sc.new)
+    try:
+        return graph.build(scope, load_concepts(ROOT / "references"), {})
+    finally:
+        graph.neighbour_files = saved
+
+
+def test_only_neighbours_are_parsed():
+    """Fix 1 (speed): unrelated files are skipped, and the graph is the same as a full parse."""
+    import graph
+    from concepts import load_concepts
+    from diffscope import from_dirs
+    from parse import parse_file
+
+    cat = load_concepts(ROOT / "references")
+    for scope in (from_dirs(EX / "js-neighbours" / "before", EX / "js-neighbours" / "after"), _git_scope("js-neighbours")):
+        g = graph.build(scope, cat, {})
+        changed = [s for rel, text in scope.new.items() for s in parse_file(rel, text)]
+        parsed = set(scope.new) | graph.neighbour_files(scope, changed, graph._suffix_index(set(scope.universe)))
+        assert "src/money.ts" in parsed  # defines formatPrice, called by addItem
+        assert "src/unrelated.ts" not in parsed
+        assert "src/audit.ts" not in parsed  # log() is defined in 4 files: the name alone links nothing
+        assert g == _full_parse_graph(scope), "selective parse changed the graph"
+        assert edge(g, "addItem", "formatPrice", "calls")
+        assert edge(g, "startCheckout", "addItem", "calls")
+        assert "log" not in labels(g)
+    g, _, card, err, _ = run("js-neighbours")
+    assert err.strip() == "", err
+    assert len(card.strip().splitlines()) <= 5
+
+
+def test_same_diff_same_map():
+    """Fix 1 (determinism): context and links never depend on Python's hash order."""
+    outs = []
+    for seed in ("1", "2", "3"):
+        out = Path(tempfile.mkdtemp(prefix="underneath-seed-"))
+        base = EX / "python-dashboard"
+        subprocess.run(
+            [sys.executable, CLI, "extract", "--before", base / "before", "--after", base / "after", "--out", out],
+            capture_output=True, text=True, check=True, env={**os.environ, "PYTHONHASHSEED": seed},
+        )
+        outs.append((out / "graph.json").read_text())
+    assert outs[0] == outs[1] == outs[2]
+
+
+def test_moved_code_is_not_new():
+    """Fix 2: a component moved to its own file reads as moved, not as new + removed."""
+    g, brief, card, err, out = run("react-move")
+    by = {n["label"]: n for n in g["nodes"]}
+    assert by["StatCard"]["status"] == "moved"
+    assert by["StatCard"]["moved_from"] == "src/Dashboard.jsx:3"
+    assert by["TripList"]["status"] == "modified"  # moved and edited
+    assert by["TripList"]["moved_from"] == "src/Dashboard.jsx:12"
+    assert by["DashboardHeader"]["status"] == "moved"  # pulled out of Dashboard's JSX, new name
+    assert by["DashboardHeader"]["moved_from"] == "src/Dashboard.jsx:24"
+    assert by["EmptyState"]["status"] == "new"
+    assert g["summary"]["removed"] == []
+    assert g["summary"]["added_lines"] <= 22, g["summary"]["added_lines"]  # v0.1 counted 37: moved lines are not new
+    head = card.splitlines()[0]
+    assert "1 new" in head and "2 moved" in head and "removed" not in head, head
+    assert "moved from src/Dashboard.jsx:3" in brief
+    assert err.strip() == "", err
+    assert 'class="nd fn-mov' in (out / "latest.html").read_text()
+
+
+def test_tests_are_not_nodes():
+    """Fix 3: test functions become "tested by N", their concepts are not counted."""
+    g, brief, card, err, _ = run("python-tests")
+    assert not any(n["test"] or n["label"].startswith("test_") for n in g["nodes"])
+    by = {n["label"]: n for n in g["nodes"]}
+    assert len(by["total"]["tested_by"]) == 2
+    assert len(by["apply_discount"]["tested_by"]) == 1
+    assert g["summary"]["tests"] == 3
+    assert g["summary"]["new"] == 1 and g["summary"]["modified"] == 1
+    assert "py.contextManager" not in {c["id"] for c in g["concepts"]}  # `with pytest.raises` is in the test only
+    assert "3 tests" in card.splitlines()[0]
+    assert err.strip() == "", err
 
 
 if __name__ == "__main__":

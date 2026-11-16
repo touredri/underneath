@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import keyword
 import re
 from collections import Counter, defaultdict
 from pathlib import PurePosixPath
@@ -13,13 +14,41 @@ from parse import Symbol, parse_file
 
 LIMITS = {"changed": 7, "context": 3, "concepts": 5, "min_lines": 8}
 
-STATUS_SCORE = {"new": 3, "modified": 2}
+STATUS_SCORE = {"new": 3, "modified": 2, "moved": 0}
+MOVE_SIMILARITY = 0.6  # below this, a same-named symbol elsewhere is a rewrite, not a move
+EXTRACT_SHARE = 0.9  # share of a new symbol's lines found in one old symbol to call it extracted
 
 _TEST = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*\.py$|_test\.py$|\.(test|spec)\.[jt]sx?$")
 
 
 def is_test(path: str) -> bool:
     return bool(_TEST.search(path))
+
+
+_EXPORT = re.compile(r"^\s*export\s+(?:default\s+)?")
+
+
+def _similarity(a: Symbol, b: Symbol) -> float:
+    """Share of identical lines; 1.0 when only whitespace or an `export` keyword differs."""
+    x, y = _EXPORT.sub("", a.norm()), _EXPORT.sub("", b.norm())
+    if x == y:
+        return 1.0
+    la = [l.strip() for l in a.source.splitlines() if l.strip()]
+    lb = [l.strip() for l in b.source.splitlines() if l.strip()]
+    return min(difflib.SequenceMatcher(None, la, lb, autojunk=False).ratio(), 0.999)
+
+
+_SIGNIFICANT = re.compile(r"\w{2}.*\w{2}|\w{4}")
+
+
+def _line_bag(source: str) -> Counter:
+    """Stripped lines that carry code (not `}`, `)}`, `</div>`), counted."""
+    return Counter(l.strip() for l in source.splitlines() if _SIGNIFICANT.search(l))
+
+
+def _containment(mine: Counter, theirs: Counter) -> float:
+    total = sum(mine.values())
+    return sum((mine & theirs).values()) / total if total else 0.0
 
 
 def _added_lines(old: str, new: str) -> int:
@@ -37,10 +66,22 @@ _PY_IMPORT = re.compile(r"(?m)^\s*from\s+([\w.]+)\s+import\s")
 _JS_EXTS = ("", ".ts", ".tsx", ".js", ".jsx", ".mjs", "/index.ts", "/index.tsx", "/index.js", "/index.jsx")
 
 
-def _imports(file: str, text: str, files: set[str]) -> set[str]:
+def _suffix_index(files: set[str]) -> dict[str, list[str]]:
+    """Every trailing path of every file (`b/c.py`, `c.py` for `a/b/c.py`) -> files ending with it."""
+    idx: dict[str, list[str]] = defaultdict(list)
+    for f in files:
+        parts = f.split("/")
+        for i in range(1, len(parts)):
+            idx["/".join(parts[i:])].append(f)
+    return idx
+
+
+def _imports(file: str, text: str, files: set[str], suffixes: dict[str, list[str]] | None = None) -> set[str]:
     out = set()
     here = PurePosixPath(file).parent
     if file.endswith(".py"):
+        if suffixes is None:
+            suffixes = _suffix_index(files)
         for mod in _PY_IMPORT.findall(text):
             dots = len(mod) - len(mod.lstrip("."))
             parts = mod.lstrip(".").split(".") if mod.strip(".") else []
@@ -56,7 +97,7 @@ def _imports(file: str, text: str, files: set[str]) -> set[str]:
                     out.add(cand)
                 else:
                     # absolute imports from a src/ layout or a sub-package
-                    hits = [f for f in files if f.endswith("/" + cand)]
+                    hits = suffixes.get(cand, [])
                     if len(hits) == 1:
                         out.add(hits[0])
     else:
@@ -78,19 +119,131 @@ def _imports(file: str, text: str, files: set[str]) -> set[str]:
     return out
 
 
+# ------------------------------------------------------------ neighbours ---
+
+_METHOD_PREFIX = r"(?:(?:async|static|public|private|protected|override|readonly|get|set)\s+)*\*?\s*"
+_IDENT = re.compile(r"[A-Za-z_$][\w$]*")
+_NAME_IN = re.compile(r"[A-Za-z_$][\w$]*(?=\s*\(?\s*$)|[A-Za-z_$][\w$]*$")
+RARE = 3  # a callee defined in more files than this cannot resolve by name alone
+_RESERVED = set(keyword.kwlist) | {
+    "default", "constructor", "function", "class", "const", "let", "var", "new", "this", "super",
+    "export", "import", "return", "typeof", "delete", "void", "yield", "await", "async", "static",
+}
+
+
+def _alt(names) -> str:
+    return "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+
+
+def _family(path: str) -> str:
+    return "sql" if path.endswith(".sql") else "py" if path.endswith(".py") else "js"
+
+
+def _stem(path: str) -> str:
+    p = PurePosixPath(path)
+    return p.parent.name if p.stem in ("index", "__init__") else p.stem
+
+
+def neighbour_files(scope: Scope, changed: list[Symbol], suffixes: dict[str, list[str]]) -> set[str]:
+    """Files worth parsing besides the changed ones.
+
+    Parsing every file of a large repository takes seconds. A few text scans
+    find the only files that can add an edge to a changed symbol, given how
+    `resolve` works (same file, imported file, or a name defined only once):
+    - files a changed file imports, and files that import a changed file;
+    - callers by name: files that mention a changed symbol whose name is
+      defined nowhere else (if it is defined elsewhere too, only imports link it);
+    - callees by name: files that define a name a changed symbol calls, when at
+      most RARE files define it.
+    Definition patterns match more than the parser keeps, so a name never
+    looks unique when it is not.
+    """
+    files = set(scope.universe)
+    changed_files = set(scope.new)
+    callers: dict[str, set[str]] = defaultdict(set)  # name -> families
+    callees: dict[str, set[str]] = defaultdict(set)
+    for s in changed:
+        fam = _family(s.file)
+        callers[s.name.split(".")[-1]].add(fam)
+        if "." in s.qualname:
+            callers[s.qualname.split(".")[0]].add(fam)  # a constructor is called by its class name
+        for n in (*s.calls, *s.renders, *s.decorators):
+            callees[n].add(fam)
+    names = {n for n in set(callers) | set(callees) if _IDENT.fullmatch(n) and n not in _RESERVED}
+
+    out: set[str] = set()
+    for rel in changed_files:
+        out |= _imports(rel, scope.new[rel], files, suffixes)
+
+    # Importers of a changed file: an import line that names its module, confirmed by _imports.
+    stems = {_stem(f) for f in changed_files} - {""}
+    if stems:
+        rx = rf"(?:\bimport\b|\bfrom\b|\brequire\s*\().*(?<![\w$])(?:{_alt(stems)})(?![\w$])"
+        for rel in scope.scan(rx):
+            if rel not in changed_files and changed_files & _imports(rel, scope.universe[rel], files, suffixes):
+                out.add(rel)
+
+    # SQL: names are case-insensitive and SQL repos are small; take every file that mentions one.
+    sql = {s.name.split(".")[-1].lower() for s in changed if s.lang == "sql"}
+    for s in changed:
+        if s.lang == "sql":
+            sql.update(r.split(".")[-1].lower() for r in s.refs)
+    if sql:
+        out |= {f for f in scope.scan(rf"(?i)\b(?:{_alt(sql)})\b") if f.endswith(".sql")}
+
+    if not names:
+        return out - changed_files
+
+    alt = _alt(names)
+    defined: dict[tuple[str, str], set[str]] = defaultdict(set)  # (family, name) -> files
+
+    def collect(pattern: str, fam: str, only: set[str] | None = None) -> None:
+        for rel, matches in scope.scan(pattern).items():
+            if _family(rel) != fam or (only is not None and rel not in only):
+                continue
+            for m in matches:
+                hit = _NAME_IN.search(m)
+                if hit and hit.group(0) in names:
+                    defined[(fam, hit.group(0))].add(rel)
+
+    collect(rf"^[ \t]*(?:async\s+)?(?:def|class)\s+(?:{alt})\b", "py")
+    collect(
+        rf"^(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function\*?\s*|(?:const|let|var)\s+|class\s+)(?:{alt})(?![\w$])",
+        "js",
+    )
+    # JS class methods have no keyword: only count them in files that declare a class.
+    class_files = set(scope.scan(r"\bclass\s+[A-Za-z_$]"))
+    collect(rf"^[ \t]+{_METHOD_PREFIX}(?:{alt})\s*\(", "js", class_files)
+
+    for n, fams in callees.items():
+        for f in fams:
+            hits = defined.get((f, n), set())
+            if len(hits) <= RARE:
+                out |= hits
+    unique = {n for n, fams in callers.items() if n in names and all(len(defined[(f, n)] - changed_files) == 0 for f in fams)}
+    if unique:
+        out |= set(scope.scan(rf"(?<![\w$])(?:{_alt(unique)})(?![\w$])"))
+    return out - changed_files
+
+
 # ----------------------------------------------------------------- graph ---
 
 
 def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: dict | None = None) -> dict:
     lim = {**LIMITS, **(limits or {})}
 
-    # 1. Parse the current universe and the previous version of changed files.
+    # 1. Parse the changed files (both versions), then only the files that can
+    #    connect to them. The rest of the universe is never parsed.
     syms: dict[str, Symbol] = {}
     by_file: dict[str, list[Symbol]] = defaultdict(list)
-    for rel, text in scope.universe.items():
+
+    def take(rel: str, text: str) -> None:
         for s in parse_file(rel, text):
             syms[s.key] = s
             by_file[rel].append(s)
+
+    for rel, text in scope.new.items():
+        take(rel, text)
     old_syms: dict[str, Symbol] = {}
     for rel, text in scope.old.items():
         for s in parse_file(rel, text):
@@ -108,14 +261,50 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             elif o.norm() != s.norm():
                 status[s.key] = "modified"
                 added[s.key] = _added_lines(o.source, s.source)
-    removed = sorted(
-        o.label for k, o in old_syms.items() if k not in syms and o.file in scope.changed
-    )
+    gone = {k: o for k, o in old_syms.items() if k not in syms and o.file in scope.changed}
     total_added = sum(_added_lines(scope.old.get(r, ""), t) for r, t in scope.new.items())
 
-    # 3. Resolve calls, renders and SQL references to symbols.
+    # A "new" symbol that already existed elsewhere in the diff was moved, not
+    # written: a split file, a rename or a component pulled out of a big
+    # function must not read as hundreds of new lines.
+    # - same name, gone from its old place, mostly the same body: moved (or moved and edited);
+    # - otherwise, nearly all its lines were already in one old symbol: extracted from it.
+    moved_from: dict[str, str] = {}
+    old_lines = {k: _line_bag(o.source) for k, o in old_syms.items() if o.file in scope.changed}
+    for k in [k for k, v in status.items() if v == "new"]:
+        s = syms[k]
+        fam = s.lang == "python"
+        same = [o for o in gone.values() if o.name == s.name and (o.lang == "python") == fam]
+        best = max(((_similarity(o, s), o) for o in same), key=lambda p: (p[0], p[1].file), default=(0.0, None))
+        lines = added[k]
+        if best[0] >= MOVE_SIMILARITY:
+            sim, o = best
+            del gone[o.key]
+            status[k], added[k] = ("moved", 0) if sim == 1.0 else ("modified", _added_lines(o.source, s.source))
+        else:
+            mine = _line_bag(s.source.split("\n", 1)[-1])  # the declaration line is new by definition
+            if sum(mine.values()) < 3:
+                continue
+            cands = [(_containment(mine, old_lines[ok]), ok) for ok, o in old_syms.items()
+                     if ok in old_lines and (o.lang == "python") == fam]
+            share, ok = max(cands, key=lambda p: (p[0], p[1]), default=(0.0, ""))
+            if share < EXTRACT_SHARE:
+                continue
+            o = old_syms[ok]
+            status[k] = "moved"
+            added[k] = sum((mine - old_lines[ok]).values())
+        moved_from[k] = f"{o.file}:{o.start_line}"
+        total_added -= lines - added[k]
+    total_added = max(total_added, 0)
+    removed = sorted(o.label for o in gone.values())
+
+    # 3. Parse the neighbours, then resolve calls, renders and SQL references.
     files = set(scope.universe)
-    imports = {f: _imports(f, t, files) for f, t in scope.universe.items()}
+    suffixes = _suffix_index(files)
+    seeds = [syms[k] for k in status if not is_test(syms[k].file)]  # nothing calls a test
+    for rel in sorted(neighbour_files(scope, seeds, suffixes)):
+        take(rel, scope.universe[rel])
+    imports = {f: _imports(f, scope.universe.get(f) or scope.new.get(f, ""), files, suffixes) for f in by_file}
     by_name: dict[str, list[Symbol]] = defaultdict(list)
     for s in syms.values():
         by_name[s.name].append(s)
@@ -126,7 +315,8 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             by_name[short].append(s)
 
     def resolve(src: Symbol, name: str) -> Symbol | None:
-        cands = [c for c in by_name.get(name, []) if c.key != src.key]
+        # Sorted by place in the code, so the choice never depends on parse order.
+        cands = sorted((c for c in by_name.get(name, []) if c.key != src.key), key=lambda c: (c.file, c.start_line, c.qualname))
         if not cands:
             return None
         same = [c for c in cands if c.file == src.file]
@@ -172,12 +362,14 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         out_e[a].add(b)
         in_e[b].add(a)
 
-    # 4. Rank changed symbols and pick what is shown.
-    changed = [k for k in status]
+    # 4. Rank changed symbols and pick what is shown. Tests are not drawn: they
+    #    become "tested by N tests" on what they call (unless only tests changed).
+    changed_tests = [k for k in status if is_test(syms[k].file)]
+    changed = [k for k in status if not is_test(syms[k].file)] or changed_tests
 
     def score(k: str) -> float:
         s = syms[k]
-        neigh = (out_e[k] | in_e[k]) - {k}
+        neigh = {n for n in (out_e[k] | in_e[k]) - {k} if not is_test(syms[n].file)}  # tests are counted apart
         deg = len([n for n in neigh if n in status]) + 0.5 * len([n for n in neigh if n not in status])
         return (
             STATUS_SCORE[status[k]]
@@ -193,7 +385,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
     hidden = changed[lim["changed"] :]
 
     tested_by: dict[str, list[str]] = defaultdict(list)
-    for k in changed:
+    for k in status:
         for n in in_e[k]:
             if is_test(syms[n].file) and not is_test(syms[k].file):
                 tested_by[k].append(syms[n].label)
@@ -206,9 +398,11 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             if n not in status:
                 ctx_scores[n] += 2  # callers matter most: they are what the change can break
         for n in out_e[k]:
-            if n not in status:
+            if n not in status and not is_test(syms[n].file):
                 ctx_scores[n] += 1
-    context = [k for k, _ in ctx_scores.most_common(lim["context"])]
+    # Ties are broken by place in the code, never by set order: the same diff gives the same map.
+    ranked_ctx = sorted(ctx_scores, key=lambda k: (-ctx_scores[k], syms[k].file, syms[k].start_line))
+    context = ranked_ctx[: lim["context"]]
 
     visible = shown + context
     vis_set = set(visible)
@@ -276,6 +470,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
                 "line": s.start_line,
                 "end_line": s.end_line,
                 "status": status.get(k, "context"),
+                "moved_from": moved_from.get(k, ""),
                 "signature": s.signature,
                 "added_lines": added.get(k, 0),
                 "entry": s.entry,
@@ -319,8 +514,10 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         "root": str(scope.root),
         "base": scope.base_label,
         "summary": {
-            "new": sum(1 for v in status.values() if v == "new"),
-            "modified": sum(1 for v in status.values() if v == "modified"),
+            "new": sum(1 for k in changed if status[k] == "new"),
+            "modified": sum(1 for k in changed if status[k] == "modified"),
+            "moved": sum(1 for k in changed if status[k] == "moved"),
+            "tests": len(changed_tests) if changed is not changed_tests else 0,
             "removed": removed,
             "files": scope.changed,
             "added_lines": total_added,
@@ -328,7 +525,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             "more_concepts": [catalogue[c].label for c in more_concepts],
             "truncated_universe": scope.truncated,
         },
-        "skip": total_added < lim["min_lines"] and not any(v == "new" for v in status.values()),
+        "skip": total_added < lim["min_lines"] and not any(status[k] == "new" for k in changed),
         "nodes": nodes,
         "concepts": concept_nodes,
         "edges": vis_edges,

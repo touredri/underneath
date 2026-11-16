@@ -1,0 +1,16 @@
+{
+  "nodes": {
+    "n1": {"summary": "Shows EmptyState with a retry button when stats are missing, otherwise the header, two stat cards and the trip list."},
+    "n2": {"summary": "Shows a message and a Retry button that calls onRetry."},
+    "n3": {"summary": "Moved to dash/ and now hides trips whose status is DONE."},
+    "n4": {"summary": "Pulled out of Dashboard unchanged: the title, the weekly counts and the close button."},
+    "n5": {"summary": "Moved to dash/ unchanged: a clickable card with a title and a value."}
+  },
+  "concepts": {
+    "react.useState": {"here": "open remembers which card was clicked; each click re-renders Dashboard with the new value."},
+    "react.callbackProps": {"here": "Dashboard passes onOpen, onRetry and setOpen down; the children call them instead of owning the state."},
+    "react.keys": {"here": "Trips are keyed by trip.id, so filtering out DONE trips keeps each row matched to its trip."}
+  },
+  "watch": [],
+  "fundamental": {"id": "closures", "text": "Each onOpen arrow closes over setOpen and its own card name, so a click on Trips sets 'trips' and nothing else."}
+}

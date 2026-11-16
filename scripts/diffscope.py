@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from parse import language_for
+from parse import LANG_BY_EXT, language_for
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", "out", "coverage", ".venv", "venv",
@@ -26,6 +27,25 @@ class Scope:
     deleted: list[str] = field(default_factory=list)
     universe: dict[str, str] = field(default_factory=dict)  # every supported file, current content
     truncated: bool = False
+    git_root: Path | None = None  # set when the universe is a git working tree: scans use git grep
+
+    def scan(self, pattern: str) -> dict[str, list[str]]:
+        """Every match of a Perl-style regex, by universe file. Matches never span lines.
+
+        In a git working tree this runs `git grep -P` (C, multithreaded), which
+        is 10 to 50 times faster than a Python scan of a large repository.
+        """
+        if self.git_root is not None:
+            hits = _git_grep(self.git_root, pattern)
+            if hits is not None:
+                return {f: m for f, m in hits.items() if f in self.universe}
+        rx = re.compile(pattern, re.MULTILINE)
+        out = {}
+        for rel, text in self.universe.items():
+            found = [m.group(0) for m in rx.finditer(text)]
+            if found:
+                out[rel] = found
+        return out
 
     @property
     def changed(self) -> list[str]:
@@ -56,10 +76,33 @@ def _git(root: Path, *args: str, check=True) -> str:
     return res.stdout
 
 
+_GREP_SPECS = [f"*{ext}" for ext in LANG_BY_EXT]
+_grep_ok: dict[Path, bool] = {}
+
+
+def _git_grep(root: Path, pattern: str) -> dict[str, list[str]] | None:
+    """`git grep -P -o` over tracked and untracked files. None if this git cannot do it."""
+    if _grep_ok.get(root) is False:
+        return None
+    res = subprocess.run(
+        ["git", "grep", "--untracked", "-I", "-P", "-o", "--null", "-e", pattern, "--", *_GREP_SPECS],
+        cwd=root, capture_output=True, text=True, errors="replace",
+    )
+    if res.returncode not in (0, 1):  # 1 = no match; anything else = no PCRE support or a bad pattern
+        _grep_ok[root] = False
+        return None
+    _grep_ok[root] = True
+    out: dict[str, list[str]] = {}
+    for line in res.stdout.splitlines():
+        rel, _, match = line.partition("\0")
+        out.setdefault(rel, []).append(match)
+    return out
+
+
 def from_git(cwd: Path, base: str = "HEAD") -> Scope:
     root = Path(_git(cwd, "rev-parse", "--show-toplevel").strip())
     has_head = subprocess.run(["git", "rev-parse", "--verify", "-q", base], cwd=root, capture_output=True).returncode == 0
-    scope = Scope(root=root, base_label=base if has_head else "(empty repository)")
+    scope = Scope(root=root, base_label=base if has_head else "(empty repository)", git_root=root)
 
     statuses: dict[str, str] = {}
     if has_head:
