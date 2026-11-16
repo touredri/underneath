@@ -1,0 +1,54 @@
+{
+  "about": "bulletproof-react f471c91: new rbac module (ROLES, useRBAC with a memoized checkAccess, RBAC wrapper component); navigation items, discussion deletion and the users page are restricted to admins",
+  "concepts": {
+    "expected": [
+      "react.useCallback",
+      "react.customHook",
+      "react.keys",
+      "react.callbackProps"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "SideNavigation",
+        "useRBAC",
+        "calls"
+      ],
+      [
+        "UserNavigation",
+        "useRBAC",
+        "calls"
+      ],
+      [
+        "RBAC",
+        "useRBAC",
+        "calls"
+      ],
+      [
+        "DeleteDiscussion",
+        "RBAC",
+        "renders"
+      ],
+      [
+        "DeleteDiscussion",
+        "useDeleteDiscussion",
+        "calls"
+      ],
+      [
+        "Users",
+        "RBAC",
+        "renders"
+      ],
+      [
+        "Users",
+        "UsersList",
+        "renders"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

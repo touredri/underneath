@@ -1,0 +1,18 @@
+{
+  "about": "bulletproof-react 5d4cbbb: DiscussionsList prefetches a discussion's query when the user hovers its View link (onMouseEnter calls queryClient.prefetchQuery)",
+  "concepts": {
+    "expected": [
+      "react.callbackProps"
+    ],
+    "allowed": [
+      "react.customHook"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["DiscussionsList", "getDiscussionQueryOptions", "calls"],
+      ["DiscussionsList", "useDiscussions", "calls"],
+      ["DiscussionsList", "DeleteDiscussion", "renders"]
+    ]
+  }
+}

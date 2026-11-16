@@ -1,0 +1,37 @@
+{
+  "about": "bulletproof-react 4dd2427: RBAC gains a policyCheck prop and a POLICIES map ('comment:delete'); CommentsList wraps the delete button in <RBAC policyCheck=...> instead of comparing author ids inline",
+  "concepts": {
+    "expected": [
+      "react.useCallback",
+      "react.customHook",
+      "react.keys"
+    ],
+    "allowed": [
+      "react.indexKey"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "CommentsList",
+        "useDiscussionComments",
+        "calls"
+      ],
+      [
+        "CommentsList",
+        "RBAC",
+        "renders"
+      ],
+      [
+        "CommentsList",
+        "DeleteComment",
+        "renders"
+      ],
+      [
+        "RBAC",
+        "useRBAC",
+        "calls"
+      ]
+    ]
+  }
+}

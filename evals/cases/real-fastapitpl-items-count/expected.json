@@ -1,0 +1,14 @@
+{
+  "about": "full-stack-fastapi-template 98c78e4: read_items counts only the current user's items for non-superusers (the count query moves into each branch with a WHERE on owner_id)",
+  "concepts": {
+    "expected": [
+      "py.decorator"
+    ],
+    "allowed": [
+      "sql.aggregation"
+    ]
+  },
+  "edges": {
+    "expected": []
+  }
+}

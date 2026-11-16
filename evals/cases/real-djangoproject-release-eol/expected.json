@@ -1,0 +1,14 @@
+{
+  "about": "djangoproject.com 283b7c08: Release.save delegates to a new set_previous_release_as_eol(), which also handles pre-releases (alpha to beta, beta to rc, rc to final) and sets eol_date with filter(**kwargs).update() on releases not yet EOL",
+  "concepts": {
+    "expected": [
+      "py.varargs"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["Release.save", "Release.set_previous_release_as_eol", "calls"]
+    ]
+  }
+}

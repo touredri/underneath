@@ -1,0 +1,20 @@
+{
+  "about": "full-stack-fastapi-template dda7934: items page gets page-based pagination from the URL search params (useQuery with placeholder data, an effect that prefetches the next page, Previous/Next buttons); the Suspense table body is removed, its skeleton rows (keyed by map index) move into ItemsTable",
+  "concepts": {
+    "expected": [
+      "react.useEffect",
+      "react.keys",
+      "react.callbackProps"
+    ],
+    "allowed": [
+      "react.indexKey"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["ItemsTable", "getItemsQueryOptions", "calls"],
+      ["ItemsTable", "ActionsMenu", "renders"],
+      ["Items", "ItemsTable", "renders"]
+    ]
+  }
+}

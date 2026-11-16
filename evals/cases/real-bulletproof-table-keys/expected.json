@@ -1,0 +1,14 @@
+{
+  "about": "bulletproof-react 9468e1a: style fixes; Table moves row striping from an index test to odd/even classes (its keys mix ids and map indexes: column.title + index, entry?.id || entryIndex), Button drops broken hover variants",
+  "concepts": {
+    "expected": [
+      "react.keys"
+    ],
+    "allowed": [
+      "react.indexKey"
+    ]
+  },
+  "edges": {
+    "expected": []
+  }
+}

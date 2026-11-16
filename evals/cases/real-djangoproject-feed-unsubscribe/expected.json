@@ -1,0 +1,33 @@
+{
+  "about": "djangoproject.com 22f9fcc1 (2013): denied feeds are unsubscribed from the PubSubHubbub hub; Feed.save and Feed.delete share a new unsubscribe() that ignores a missing Subscription (except DoesNotExist: pass); != None becomes is not None",
+  "concepts": {
+    "expected": [
+      "py.varargs",
+      "py.exceptions"
+    ],
+    "allowed": [
+      "py.swallowedException"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Feed.save",
+        "Feed.unsubscribe",
+        "calls"
+      ],
+      [
+        "Feed.delete",
+        "Feed.unsubscribe",
+        "calls"
+      ]
+    ],
+    "forbidden": [
+      [
+        "Command.handle_noargs",
+        "Feed.unsubscribe",
+        "calls"
+      ]
+    ]
+  }
+}

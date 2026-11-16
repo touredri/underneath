@@ -1,0 +1,62 @@
+{
+  "about": "full-stack-fastapi-template 689d710: authenticate() verifies against a dummy hash when the user is missing (constant time); password recovery and reset no longer reveal whether an email exists",
+  "concepts": {
+    "expected": [
+      "py.decorator",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "recover_password",
+        "get_user_by_email",
+        "calls"
+      ],
+      [
+        "recover_password",
+        "generate_password_reset_token",
+        "calls"
+      ],
+      [
+        "recover_password",
+        "generate_reset_password_email",
+        "calls"
+      ],
+      [
+        "recover_password",
+        "send_email",
+        "calls"
+      ],
+      [
+        "reset_password",
+        "verify_password_reset_token",
+        "calls"
+      ],
+      [
+        "reset_password",
+        "get_user_by_email",
+        "calls"
+      ],
+      [
+        "reset_password",
+        "update_user",
+        "calls"
+      ],
+      [
+        "authenticate",
+        "get_user_by_email",
+        "calls"
+      ],
+      [
+        "authenticate",
+        "verify_password",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "about": "djangoproject.com e260c230: new NormalizeSlashesMiddleware collapses repeated slashes and redirects permanently when the normalized path resolves (try resolve / except Resolver404: pass / else redirect)",
+  "concepts": {
+    "expected": [
+      "py.exceptions",
+      "py.dunder"
+    ],
+    "allowed": [
+      "py.swallowedException"
+    ]
+  },
+  "edges": {
+    "expected": []
+  }
+}

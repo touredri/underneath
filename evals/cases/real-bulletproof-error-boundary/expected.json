@@ -1,0 +1,12 @@
+{
+  "about": "bulletproof-react 9818ed5: AppProvider wraps the app in Suspense and an ErrorBoundary with a new ErrorFallback component; the axios response interceptor gets an error handler that logs and pushes a notification",
+  "concepts": {
+    "expected": [
+      "react.callbackProps"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

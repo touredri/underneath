@@ -1,0 +1,15 @@
+{
+  "about": "bulletproof-react 870c7f6: useCreateDiscussion and useDeleteDiscussion get optimistic updates (async onMutate cancels queries and patches the cache, onError rolls back, onSettled invalidates); DeleteDiscussion drops its own invalidation",
+  "concepts": {
+    "expected": [
+      "react.customHook",
+      "js.asyncAwait"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["DeleteDiscussion", "useDeleteDiscussion", "calls"]
+    ]
+  }
+}

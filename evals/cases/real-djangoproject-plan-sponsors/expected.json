@@ -1,0 +1,35 @@
+{
+  "about": "djangoproject.com 645c4d37: new plan_sponsors() falls back down the sponsorship tiers (dict lookups in a loop over one prefetched by-level mapping) until one has sponsors; sponsor_plan passes the plan the sponsors belong to; PLANS gain a first_sponsor label",
+  "concepts": {
+    "expected": [
+      "py.comprehension",
+      "py.decorator",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "sponsor_plan",
+        "plan_sponsors",
+        "calls"
+      ],
+      [
+        "plan_sponsors",
+        "CorporateMemberManager.by_membership_level",
+        "calls"
+      ]
+    ],
+    "forbidden": [
+      [
+        "sponsor_plan",
+        "StripeTextInput.render",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

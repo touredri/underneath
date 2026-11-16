@@ -1,0 +1,20 @@
+{
+  "about": "full-stack-fastapi-template 68ae097: new Sidebar (Chakra drawer on mobile), SidebarItems (map over a static menu keyed by title), UserInfo (useEffect with an inner async fetch wrapped in try/catch that logs) and Layout",
+  "concepts": {
+    "expected": [
+      "react.useState",
+      "react.useEffect",
+      "react.keys",
+      "react.callbackProps",
+      "js.asyncAwait"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["Sidebar", "SidebarItems", "renders"],
+      ["Sidebar", "UserInfo", "renders"],
+      ["Layout", "Sidebar", "renders"]
+    ]
+  }
+}

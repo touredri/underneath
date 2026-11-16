@@ -1,0 +1,18 @@
+{
+  "about": "djangoproject.com 977c2352: users can delete their own account; DeleteProfileForm refuses staff, deletes the user inside @transaction.atomic and turns a ProtectedError into a form error; delete_profile view logs out and redirects on success",
+  "concepts": {
+    "expected": [
+      "py.inheritance",
+      "py.exceptions",
+      "py.decorator",
+      "py.varargs"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["delete_profile", "DeleteProfileForm.delete", "calls"],
+      ["DeleteProfileForm.delete", "DeleteProfileForm.add_errors_from_protectederror", "calls"]
+    ]
+  }
+}

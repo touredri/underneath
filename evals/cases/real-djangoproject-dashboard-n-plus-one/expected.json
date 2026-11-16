@@ -1,0 +1,42 @@
+{
+  "about": "djangoproject.com 68a439a5: fixes the dashboard N+1 (one latest-datum query per metric) with a MetricQuerySet that annotates the latest datum through a correlated Subquery; index builds its list with one query per Metric subclass; raw SQL in _gather_data_periodic now uses a content_type() classmethod",
+  "concepts": {
+    "expected": [
+      "py.comprehension",
+      "py.inheritance",
+      "sql.aggregation"
+    ],
+    "allowed": [
+      "py.queryInLoop",
+      "sql.subquery",
+      "py.decorator"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "index",
+        "MetricQuerySet.for_dashboard",
+        "calls"
+      ],
+      [
+        "MetricQuerySet.for_dashboard",
+        "MetricQuerySet.with_latest",
+        "calls"
+      ],
+      [
+        "MetricQuerySet.with_latest",
+        "Metric.content_type",
+        "calls"
+      ],
+      [
+        "Metric._gather_data_periodic",
+        "Metric.content_type",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

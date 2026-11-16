@@ -1,0 +1,430 @@
+import os
+import sys
+import tempfile
+from http import HTTPStatus
+from io import StringIO
+from unittest.mock import patch
+
+from django.conf import settings
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.core.management import call_command
+from django.test import TestCase, override_settings
+from django.urls import NoReverseMatch, get_resolver
+from django.utils.translation import activate, gettext as _
+from django_hosts.resolvers import reverse
+from django_recaptcha.client import RecaptchaResponse
+from playwright.sync_api import expect, sync_playwright
+
+from djangoproject.test_runner import selected_browsers
+from docs.models import DocumentRelease, Release
+
+
+def patch_captcha(is_valid=True, score=1.0, extra_data=None, **response_kwargs):
+    """Patch the only reCAPTCHA call that would otherwise reach Google's servers.
+
+    The score defaults to a passing one, so tests that do not care about
+    reCAPTCHA can just wrap their form submission in this context manager.
+    Forms whose widget declares an action must pass a matching ``action``.
+    """
+    extra_data = dict(extra_data or {})
+    extra_data.setdefault("score", score)
+    return patch(
+        "django_recaptcha.fields.client.submit",
+        return_value=RecaptchaResponse(
+            is_valid=is_valid, extra_data=extra_data, **response_kwargs
+        ),
+    )
+
+
+class ReleaseMixin:
+    @classmethod
+    def setUpTestData(cls):
+        r2, _ = Release.objects.get_or_create(version="2.0")
+        DocumentRelease.objects.get_or_create(
+            is_default=True,
+            defaults={"lang": settings.DEFAULT_LANGUAGE_CODE, "release": r2},
+        )
+
+
+class LocaleSmokeTests(TestCase):
+    """
+    Smoke test a translated string from each of the 3 locale directories
+    (one defined in settings.LOCALE_PATHS, plus the dashboard and docs apps).
+    """
+
+    def test_dashboard_locale(self):
+        """dashboard/locale/ should contain translations for 'Development dashboard'"""
+        activate("fr")
+        translated = _("Development dashboard")
+        self.assertEqual(
+            translated,
+            "Tableau de bord de développement",
+            msg="dashboard/locale/ translation not loaded or incorrect",
+        )
+
+    def test_docs_locale(self):
+        """docs/locale/ should contain translations for 'Using Django'"""
+        activate("fr")
+        translated = _("Using Django")
+        self.assertEqual(
+            translated,
+            "Utilisation de Django",
+            msg="docs/locale/ translation not loaded or incorrect",
+        )
+
+    def test_project_locale(self):
+        """locale/ should contain translations for 'Fundraising'"""
+        activate("fr")
+        translated = _("Fundraising")
+        self.assertEqual(
+            translated,
+            "Levée de fonds",
+            msg="project-level locale/ translation not loaded or incorrect",
+        )
+
+
+class TemplateViewTests(ReleaseMixin, TestCase):
+    """
+    Tests for views that are instances of TemplateView.
+    """
+
+    def assertView(self, name):
+        self.assertContains(self.client.get(reverse(name, host="www")), "django")
+
+    def test_homepage(self):
+        self.assertView("homepage")
+
+    def test_overview(self):
+        self.assertView("overview")
+
+    def test_start(self):
+        self.assertView("start")
+
+    def test_code_of_conduct(self):
+        self.assertView("code_of_conduct")
+
+    def test_conduct_faq(self):
+        self.assertView("conduct_faq")
+
+    def test_conduct_reporting(self):
+        self.assertView("conduct_reporting")
+
+    def test_conduct_enforcement(self):
+        self.assertView("conduct_enforcement")
+
+    def test_conduct_changes(self):
+        self.assertView("conduct_changes")
+
+    def test_sponsor_banner(self):
+        self.assertView("sponsor_banner")
+
+    def test_styleguide(self):
+        self.assertView("styleguide")
+
+
+class ExcludeHostsLocaleMiddlewareTests(ReleaseMixin, TestCase):
+    """
+    djangoproject.middleware.ExcludeHostsLocaleMiddleware properly prevents
+    the hosts in settings.LOCALE_MIDDLEWARE_EXCLUDED_HOSTS from being
+    processed by django.middleware.locale.LocaleMiddleware, as evidenced by
+    the presence or absence of 'Content-Language' and 'Vary' headers in the
+    response.
+    """
+
+    docs_host = "docs.djangoproject.localhost"
+    www_host = "www.djangoproject.localhost"
+
+    def test_docs_host_excluded(self):
+        """We get no Content-Language or Vary headers when docs host is excluded"""
+        with self.settings(LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[self.docs_host]):
+            resp = self.client.get("/", headers={"host": self.docs_host})
+
+        self.assertEqual(resp.status_code, HTTPStatus.OK)
+        self.assertNotIn("Content-Language", resp)
+        self.assertNotIn("Vary", resp)
+
+    def test_docs_host_with_port_excluded(self):
+        """
+        We get no Content-Language or Vary headers when docs host
+        (with a port) is excluded
+        """
+        with self.settings(LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[self.docs_host]):
+            resp = self.client.get("/", headers={"host": "%s:8000" % self.docs_host})
+        self.assertEqual(resp.status_code, HTTPStatus.FOUND)
+        self.assertNotIn("Content-Language", resp)
+        self.assertNotIn("Vary", resp)
+
+    def test_docs_host_forwarded_excluded(self):
+        """
+        We get no Content-Language or Vary headers when docs host
+        (via X-Forwarded_host) is excluded
+        """
+        with self.settings(
+            LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[self.docs_host], USE_X_FORWARDED_HOST=True
+        ):
+            resp = self.client.get("/", headers={"x-forwarded-host": self.docs_host})
+
+        self.assertEqual(resp.status_code, HTTPStatus.OK)
+        self.assertNotIn("Content-Language", resp)
+        self.assertNotIn("Vary", resp)
+
+    def test_docs_host_not_excluded(self):
+        """We still get Content-Language when docs host is not excluded"""
+        with self.settings(LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[]):
+            resp = self.client.get("/", headers={"host": self.docs_host})
+
+        self.assertEqual(resp.status_code, HTTPStatus.OK)
+        self.assertIn("Content-Language", resp)
+        self.assertIn("Vary", resp)
+
+    def test_www_host(self):
+        """www should still use LocaleMiddleware"""
+        with self.settings(LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[self.docs_host]):
+            resp = self.client.get("/", headers={"host": self.www_host})
+        self.assertEqual(resp.status_code, HTTPStatus.OK)
+        self.assertIn("Content-Language", resp)
+        self.assertIn("Vary", resp)
+
+    def test_www_host_with_port(self):
+        """www (with a port) should still use LocaleMiddleware"""
+        with self.settings(LOCALE_MIDDLEWARE_EXCLUDED_HOSTS=[self.docs_host]):
+            resp = self.client.get("/", headers={"host": "%s:8000" % self.www_host})
+        self.assertEqual(resp.status_code, HTTPStatus.OK)
+        self.assertIn("Content-Language", resp)
+        self.assertIn("Vary", resp)
+
+
+# https://adamj.eu/tech/2024/06/23/django-test-pending-migrations/
+class PendingMigrationsTests(TestCase):
+    def test_no_pending_migrations(self):
+        out = StringIO()
+        try:
+            call_command(
+                "makemigrations",
+                "--check",
+                stdout=out,
+                stderr=StringIO(),
+            )
+        except SystemExit:  # pragma: no cover
+            raise AssertionError("Pending migrations:\n" + out.getvalue()) from None
+
+
+class Header1Tests(ReleaseMixin, TestCase):
+    def extract_patterns(self, patterns, prefix="", urls=None):
+        urls = urls or []
+        for pattern in patterns:
+            if hasattr(pattern, "url_patterns"):
+                self.extract_patterns(
+                    pattern.url_patterns, prefix + pattern.pattern.regex.pattern
+                )
+            elif hasattr(pattern, "pattern") and pattern.name:
+                try:
+                    urls.append(reverse(pattern.name))
+                except NoReverseMatch:
+                    pass  # Ignore URLs that require arguments.
+        return urls
+
+    def test_single_h1_per_page(self):
+        excluded_urls = [
+            "rss/",
+            "styleguide/",  # Has multiple <h1> examples.
+            "admin/",  # Admin templates are out of our control.
+            "reset/done/",  # Uses an admin template.
+            "sitemap.xml",
+        ]
+        resolver = get_resolver()
+        urls = self.extract_patterns(resolver.url_patterns)
+        for url in urls:
+            if all(url_substring not in url for url_substring in excluded_urls):
+                with self.subTest(url=url):
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertContains(response, "<h1", count=1)
+
+
+class SecurityTxtTests(TestCase):
+    """Tests for the security.txt file."""
+
+    def test_security_txt(self):
+        """The security.txt file should be reachable at the expected URL."""
+        response = self.client.get("/.well-known/security.txt")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertIn("Expires:", response.content.decode())
+
+
+class SiteMapTests(TestCase):
+    def test_sitemap_renders(self):
+        response = self.client.get(reverse("sitemap"))
+        self.assertEqual(response.status_code, 200)
+
+
+class StaticFilesTests(TestCase):
+    @override_settings(
+        STORAGES={
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+            }
+        }
+    )
+    def test_collectstatic_with_manifeststaticfilesstorage(self):
+        with tempfile.TemporaryDirectory() as temp_dir_path:
+            with override_settings(STATIC_ROOT=temp_dir_path):
+                try:
+                    call_command("collectstatic", interactive=False, verbosity=0)
+                except ValueError as e:
+                    self.fail(e)
+
+
+class BrowserTestCaseMeta(type(StaticLiveServerTestCase)):
+    """Create one test class per selected browser.
+
+    Rather than every test looping over browsers, the metaclass makes the class
+    browser-specific and adds a subclass per extra browser to the module
+    namespace. Tests keep using ``self.browser`` and need no decoration.
+
+    With no browser selected the tests are skipped rather than defaulting to
+    one, so a run always says which engines it covered.
+    """
+
+    # The browser this class runs against; None on the base class.
+    browser_name = None
+
+    def __new__(cls, name, bases, attrs):
+        test_class = super().__new__(cls, name, bases, attrs)
+        if test_class.browser_name or not any(
+            name.startswith("test") and callable(value) for name, value in attrs.items()
+        ):
+            return test_class
+
+        if not selected_browsers:
+            test_class.__unittest_skip__ = True
+            test_class.__unittest_skip_why__ = (
+                "No browser selected; pass --browser to run the end-to-end tests."
+            )
+            return test_class
+
+        test_class.browser_name = selected_browsers[0]
+        module = sys.modules[test_class.__module__]
+        for browser in selected_browsers[1:]:
+            subclass = super().__new__(
+                cls,
+                f"{browser.capitalize()}{name}",
+                (test_class,),
+                {"browser_name": browser, "__module__": test_class.__module__},
+            )
+            setattr(module, subclass.__name__, subclass)
+        return test_class
+
+
+class EndToEndTests(
+    ReleaseMixin,
+    StaticLiveServerTestCase,
+    metaclass=BrowserTestCaseMeta,
+):
+    @classmethod
+    def setUpClass(cls):
+        os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+        super().setUpClass()
+        cls.playwright = sync_playwright().start()
+        cls.browser = getattr(cls.playwright, cls.browser_name).launch()
+        cls.mac_user_agent = "Mozilla/5.0 (Macintosh) AppleWebKit"
+        cls.windows_user_agent = "Mozilla/5.0 (Windows NT 10.0)"
+        cls.mobile_linux_user_agent = "Mozilla/5.0 (Linux; Android 10; Mobile)"
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.browser.close()
+        cls.playwright.stop()
+
+    def setUp(self):
+        super().setUp()
+        self.setUpTestData()
+
+    def test_search_ctrl_k_hotkey(self):
+        page1 = self.browser.new_page(user_agent=self.windows_user_agent)
+        page2 = self.browser.new_page(
+            user_agent=self.mobile_linux_user_agent,
+            viewport={"width": 375, "height": 812},
+        )
+        for page in [page1, page2]:
+            with self.subTest(page=page):
+                page.goto(self.live_server_url)
+                search_bar = page.locator("#id_q")
+                expect(search_bar).to_have_attribute("placeholder", "Search (Ctrl+K)")
+                is_focused = page.evaluate("document.activeElement.id === 'id_q'")
+                self.assertFalse(is_focused)
+
+                page.keyboard.press("Control+KeyK")
+                is_focused = page.evaluate("document.activeElement.id === 'id_q'")
+                self.assertTrue(is_focused)
+                page.close()
+
+    def test_search_placeholder_mac_mode(self):
+        page = self.browser.new_page(user_agent=self.mac_user_agent)
+        page.goto(self.live_server_url)
+
+        desktop_search_bar = page.locator("#id_q")
+        expect(desktop_search_bar).to_have_attribute("placeholder", "Search (⌘\u200aK)")
+
+        page.close()
+
+    def test_init_light_dark_theme_uses_existing_cookie(self):
+        page = self.browser.new_page(user_agent=self.mac_user_agent)
+        page.context.add_cookies(
+            [{"name": "theme", "value": "dark", "domain": "localhost", "path": "/"}]
+        )
+        page.goto(self.live_server_url)
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        self.assertEqual(theme, "dark")
+
+    def test_set_theme_updates_data_attribute(self):
+        page = self.browser.new_page(user_agent=self.mac_user_agent)
+        page.goto(self.live_server_url)
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        self.assertEqual(theme, "auto")
+        page.locator(".theme-toggle").click()
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        self.assertEqual(theme, "dark")
+
+    def open_page_with_color_scheme(self, color_scheme):
+        """
+        Open the site with an emulated OS color scheme.
+
+        The scheme is re-applied after navigating because Firefox drops the
+        emulation when the response carries Cross-Origin-Opener-Policy, which
+        SecurityMiddleware sends by default. Chromium is unaffected.
+
+        Upstream bug, still present in Playwright 1.62 with Firefox 153:
+        https://github.com/microsoft/playwright/issues/33866
+        """
+        page = self.browser.new_page(user_agent=self.mac_user_agent)
+        page.emulate_media(color_scheme=color_scheme)
+        page.goto(self.live_server_url)
+        page.emulate_media(color_scheme=color_scheme)
+        return page
+
+    def test_cycle_theme_when_prefers_dark(self):
+        page = self.open_page_with_color_scheme("dark")
+
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        self.assertEqual(theme, "auto")
+
+        for expected_theme in ["light", "dark", "auto"]:
+            with self.subTest(expected_theme=expected_theme):
+                page.locator(".theme-toggle").click()
+                theme = page.evaluate("document.documentElement.dataset.theme")
+                self.assertEqual(theme, expected_theme)
+
+    def test_cycle_theme_when_prefers_light(self):
+        page = self.open_page_with_color_scheme("light")
+
+        theme = page.evaluate("document.documentElement.dataset.theme")
+        self.assertEqual(theme, "auto")
+
+        for expected_theme in ["dark", "light", "auto"]:
+            with self.subTest(expected_theme=expected_theme):
+                page.locator(".theme-toggle").click()
+                theme = page.evaluate("document.documentElement.dataset.theme")
+                self.assertEqual(theme, expected_theme)

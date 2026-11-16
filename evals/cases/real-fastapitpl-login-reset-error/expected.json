@@ -1,0 +1,31 @@
+{
+  "about": "full-stack-fastapi-template 9523db2: useAuth exposes resetError; Login's async submit skips while submitting, clears the error and awaits mutateAsync inside try with a catch that only holds a comment (the hook's onError already stores the error)",
+  "concepts": {
+    "expected": [
+      "react.useState",
+      "react.customHook",
+      "react.callbackProps",
+      "js.asyncAwait"
+    ],
+    "allowed": [
+      "js.emptyCatch"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Login",
+        "useAuth",
+        "calls"
+      ],
+      [
+        "useAuth",
+        "isLoggedIn",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "about": "full-stack-fastapi-template b81cec8: new DELETE /users/me endpoint (deletes the user's items with delete(Item).where(...), then the user); delete_user becomes superuser-only through a route dependency; 403 instead of 400 for missing privileges",
+  "concepts": {
+    "expected": [
+      "py.decorator",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}

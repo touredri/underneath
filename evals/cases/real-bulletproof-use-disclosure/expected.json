@@ -1,0 +1,21 @@
+{
+  "about": "bulletproof-react 85b1c59: new useDisclosure hook (useState + three useCallback setters) replaces local open/close state in ConfirmationDialog and FormDrawer; FormDrawer's effect now lists close as a dependency",
+  "concepts": {
+    "expected": [
+      "react.useState",
+      "react.useCallback",
+      "react.customHook",
+      "react.useEffect",
+      "react.useRef",
+      "react.callbackProps",
+      "js.asyncAwait"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["FormDrawer", "useDisclosure", "calls"],
+      ["ConfirmationDialog", "useDisclosure", "calls"]
+    ]
+  }
+}

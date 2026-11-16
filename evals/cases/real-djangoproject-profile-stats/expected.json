@@ -1,0 +1,33 @@
+{
+  "about": "djangoproject.com 2495507f: Trac profile stats return StatData(count, link) with a link built by a new get_trac_link(); tickets closed (raw COUNT(DISTINCT) query) and patches submitted are dropped; the profile view filters on stat.count (stat() only had its docstring edited: not a code change since 0.4, so its closure is allowed, not expected)",
+  "concepts": {
+    "expected": [
+      "py.decorator"
+    ],
+    "allowed": [
+      "py.closure"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "tickets_fixed",
+        "get_trac_link",
+        "calls"
+      ],
+      [
+        "tickets_opened",
+        "get_trac_link",
+        "calls"
+      ],
+      [
+        "TracTicketMetric.link",
+        "get_trac_link",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

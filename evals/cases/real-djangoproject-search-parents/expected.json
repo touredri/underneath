@@ -1,0 +1,25 @@
+{
+  "about": "djangoproject.com 587f71e4: search results annotate only the 'parents' key of the metadata JSON instead of loading the whole metadata; document_url reads the annotation and falls back to metadata.get('parents') on AttributeError",
+  "concepts": {
+    "expected": [
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "DocumentQuerySet.annotate_search_results",
+        "sanitize_for_trigram",
+        "calls"
+      ]
+    ],
+    "forbidden": [
+      [
+        "DocumentQuerySet.annotate_search_results",
+        "DocumentQuerySet.search",
+        "calls"
+      ]
+    ]
+  }
+}

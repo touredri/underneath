@@ -1,0 +1,13 @@
+{
+  "about": "full-stack-fastapi-template 870d45f: the items router drops the crud layer for direct SQLModel access (select(...).where(...).offset().limit(), session.get, session.add/commit/refresh, session.delete) with Annotated dependencies",
+  "concepts": {
+    "expected": [
+      "py.decorator",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": []
+  }
+}
