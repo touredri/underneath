@@ -58,7 +58,7 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.2.0 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 16 tests and 17 eval cases green (100 % precision and recall, 0 false links), also on Python 3.10. Not yet published: the GitHub repo `touredri/underneath` is prepared (README, badge, CHANGELOG links) but not created or pushed.
+v0.2.0 (2026-11-16), see CHANGELOG.md. Dogfooded on a private 2,000-file React + FastAPI repo: a diff takes 1.5 to 4 s, `map` 5 s cold and under 1 s warm. Plugin and Stop hook tested in real `claude -p --plugin-dir` sessions. 15 tests and 17 eval cases green (100 % precision and recall, 0 false links), also on Python 3.10. Not yet published: the GitHub repo `touredri/underneath` is prepared (README, badge, CHANGELOG links) but not created or pushed.
 
 Known limits: name-based call resolution (same class, same file, imports as hints), and built-in method names (`get`, `push`…) on other objects are never linked; only top-level functions and methods (no class nodes); SQL inside strings not parsed; regex-based concept rules.
 
