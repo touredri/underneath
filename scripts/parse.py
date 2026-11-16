@@ -65,7 +65,8 @@ class Symbol:
     refs: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
     member_only: list[str] = field(default_factory=list)
-    bases: list[str] = field(default_factory=list)  # classes only: what it extends  # names only ever called as `other.name()`, never bare or on self/this
+    bases: list[str] = field(default_factory=list)  # classes only: what it extends
+    typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known  # names only ever called as `other.name()`, never bare or on self/this
     exported: bool = False
     entry: bool = False
     label: str = ""
@@ -102,6 +103,131 @@ def _signature(source: str) -> str:
     sig = re.sub(r"\s+", " ", " ".join(head)).strip().rstrip("{").rstrip(":").strip()
     sig = re.sub(r"\(\s+", "(", re.sub(r",\s*\)", ")", sig))
     return sig if len(sig) <= 120 else sig[:119].rstrip() + "…"
+
+
+# ------------------------------------------------------------ receivers ---
+# The type of `obj` in `obj.method()`, when the code states it plainly: an
+# annotation, a constructor call, a `self`/`this` attribute set from one of
+# those, or a module-level instance. No inference beyond that.
+
+_CONTAINERS = {
+    "list", "dict", "set", "tuple", "frozenset", "List", "Dict", "Set", "Tuple", "FrozenSet", "Sequence", "Iterable",
+    "Iterator", "Mapping", "MutableMapping", "Callable", "Type", "Any", "Array", "ReadonlyArray", "Record", "Map",
+    "WeakMap", "Promise", "Partial", "Readonly", "Awaitable", "Generator", "AsyncIterator", "Union",
+}
+
+
+def _type_name(text: str | None) -> str | None:
+    """`Optional[ReportCache]`, `ReportCache | None`, `: Repo` -> the class name; containers -> None."""
+    if not text:
+        return None
+    t = re.sub(r"\s+", "", text).lstrip(":")
+    t = re.sub(r"^Optional\[(.*)\]$", r"\1", t)
+    parts = [p for p in t.split("|") if p not in ("None", "null", "undefined")]
+    if len(parts) != 1:
+        return None
+    t = parts[0]
+    base = re.split(r"[\[<]", t, maxsplit=1)[0].split(".")[-1]
+    if base in _CONTAINERS or not re.fullmatch(r"[A-Z]\w*", base):
+        return None
+    return base
+
+
+def _ctor(node, src) -> str | None:
+    """`Cls(...)`, `mod.Cls(...)` or `new Cls(...)` -> Cls."""
+    if node is None:
+        return None
+    if node.type == "new_expression":
+        c = node.child_by_field_name("constructor")
+        return _type_name(_text(c, src)) if c is not None else None
+    if node.type in ("call", "await"):
+        if node.type == "await":
+            return None
+        fn = node.child_by_field_name("function")
+        return _type_name(_text(fn, src)) if fn is not None and fn.type in ("identifier", "attribute") else None
+    return None
+
+
+def _py_env(defn, src, outer_env: dict) -> tuple[dict, dict]:
+    """(names -> type, self attributes -> type) for one Python function."""
+    env, attrs = dict(outer_env), {}
+    params = defn.child_by_field_name("parameters")
+    for p in params.named_children if params is not None else []:
+        if p.type in ("typed_parameter", "typed_default_parameter"):
+            name = p.child_by_field_name("name") or next((c for c in p.named_children if c.type == "identifier"), None)
+            t = _type_name(_text(p.child_by_field_name("type"), src)) if p.child_by_field_name("type") else None
+            if name is not None and t:
+                env[_text(name, src)] = t
+    for n in _walk(defn):
+        if n.type != "assignment":
+            continue
+        left, right, ann = n.child_by_field_name("left"), n.child_by_field_name("right"), n.child_by_field_name("type")
+        t = _type_name(_text(ann, src)) if ann is not None else _ctor(right, src)
+        if t is None and right is not None and right.type == "identifier":
+            t = env.get(_text(right, src))
+        if not t or left is None:
+            continue
+        if left.type == "identifier":
+            env[_text(left, src)] = t
+        elif left.type == "attribute" and _text(left.child_by_field_name("object"), src) == "self":
+            attrs[_text(left.child_by_field_name("attribute"), src)] = t
+    return env, attrs
+
+
+def _js_env(fn, src, outer_env: dict) -> tuple[dict, dict]:
+    """(names -> type, this attributes -> type) for one JS/TS function or method."""
+    env, attrs = dict(outer_env), {}
+    params = fn.child_by_field_name("parameters")
+    for p in params.named_children if params is not None else []:
+        if p.type in ("required_parameter", "optional_parameter"):
+            name = p.child_by_field_name("pattern")
+            ann = p.child_by_field_name("type")
+            t = _type_name(_text(ann, src)) if ann is not None else None
+            if name is not None and name.type == "identifier" and t:
+                env[_text(name, src)] = t
+                if any(c.type == "accessibility_modifier" for c in p.children):
+                    attrs[_text(name, src)] = t  # constructor(private api: Api)
+    for n in _walk(fn):
+        if n.type == "variable_declarator":
+            name, ann, value = n.child_by_field_name("name"), n.child_by_field_name("type"), n.child_by_field_name("value")
+            t = _type_name(_text(ann, src)) if ann is not None else _ctor(value, src)
+            if name is not None and name.type == "identifier" and t:
+                env[_text(name, src)] = t
+        elif n.type == "assignment_expression":
+            left, right = n.child_by_field_name("left"), n.child_by_field_name("right")
+            t = _ctor(right, src) or (env.get(_text(right, src)) if right is not None and right.type == "identifier" else None)
+            if t and left is not None and left.type == "member_expression" and _text(left.child_by_field_name("object"), src) == "this":
+                attrs[_text(left.child_by_field_name("property"), src)] = t
+    return env, attrs
+
+
+def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]]:
+    """[method, Type] for each `recv.method()` whose receiver type is known."""
+    out = []
+    own = "self" if lang == "python" else "this"
+    for n in _walk(node):
+        if n.type not in ("call", "call_expression"):
+            continue
+        fn = n.child_by_field_name("function")
+        if fn is None or fn.type not in ("attribute", "member_expression"):
+            continue
+        obj = fn.child_by_field_name("object")
+        meth = fn.child_by_field_name("attribute" if fn.type == "attribute" else "property")
+        if obj is None or meth is None:
+            continue
+        t = None
+        if obj.type == "identifier":
+            t = env.get(_text(obj, src))
+        elif obj.type in ("attribute", "member_expression"):
+            inner = obj.child_by_field_name("object")
+            attr = obj.child_by_field_name("attribute" if obj.type == "attribute" else "property")
+            if inner is not None and attr is not None and _text(inner, src) == own:
+                t = attrs.get(_text(attr, src))
+        if t:
+            pair = [_text(meth, src), t]
+            if pair not in out:
+                out.append(pair)
+    return out
 
 
 # ---------------------------------------------------------------- JS / TS ---
@@ -174,13 +300,33 @@ def _js_kind(name: str, node) -> str:
     return "function"
 
 
+def _js_fn(node):
+    """The function node that holds the parameters (for `const f = memo((p) => ...)` too)."""
+    if node.child_by_field_name("parameters") is not None:
+        return node
+    for n in _walk(node):
+        if n.type in _JS_FUNC_VALUES and n.child_by_field_name("parameters") is not None:
+            return n
+    return node
+
+
 def _parse_js(path, src, lang):
     tree = _parser(lang).parse(src)
     out: list[Symbol] = []
+    module_env: dict[str, str] = {}
+    for stmt in tree.root_node.named_children:
+        decl = stmt.child_by_field_name("declaration") if stmt.type == "export_statement" else stmt
+        if decl is not None and decl.type in ("lexical_declaration", "variable_declaration"):
+            env, _ = _js_env(decl, src, {})
+            module_env.update(env)
+    class_attrs: dict[str, dict] = {}
 
     def add(name, qual, node, src_node, exported, kind=None):
         source = _text(src_node, src)
         calls, renders, direct = _js_calls(node, src)
+        env, attrs = _js_env(_js_fn(node), src, module_env)
+        if kind == "method":
+            attrs = {**class_attrs.get(qual.split(".")[0], {}), **attrs}
         k = kind or _js_kind(name, node)
         out.append(
             Symbol(
@@ -196,6 +342,7 @@ def _parse_js(path, src, lang):
                 calls=calls,
                 renders=renders,
                 member_only=_member_only(calls, direct),
+                typed_calls=_typed_calls(node, src, env, attrs, "js"),
                 exported=exported,
                 entry=exported and k == "component",
             )
@@ -208,6 +355,16 @@ def _parse_js(path, src, lang):
         fields = [_text(m, src) for m in (body.named_children if body is not None else []) if m.type != "method_definition"]
         source = head + "{" + ("\n  " + "\n  ".join(fields) + "\n" if fields else "") + "}"
         bases = re.findall(r"\bextends\s+([\w$.]+)", head)
+        attrs: dict[str, str] = {}
+        for m in body.named_children if body is not None else []:
+            if m.type == "public_field_definition":
+                nm, ann, val = m.child_by_field_name("name"), m.child_by_field_name("type"), m.child_by_field_name("value")
+                t = _type_name(_text(ann, src)) if ann is not None else _ctor(val, src)
+                if nm is not None and t:
+                    attrs[_text(nm, src)] = t
+            elif m.type == "method_definition":
+                attrs.update(_js_env(m, src, module_env)[1])
+        class_attrs[cname] = attrs
         calls, direct = [], set()
         for m in body.named_children if body is not None else []:
             if m.type != "method_definition":
@@ -301,6 +458,11 @@ def _py_calls(node, src):
 def _parse_py(path, src, lang):
     tree = _parser(lang).parse(src)
     out: list[Symbol] = []
+    module_env: dict[str, str] = {}
+    for stmt in tree.root_node.named_children:
+        if stmt.type in ("expression_statement", "assignment"):  # grammar versions differ
+            module_env.update(_py_env(stmt, src, {})[0])
+    class_attrs: dict[str, dict] = {}
 
     def decorators(outer):
         names = []
@@ -326,6 +488,9 @@ def _parse_py(path, src, lang):
         qual = f"{cls}.{name}" if cls else name
         source = _text(outer, src)
         calls, direct = _py_calls(defn, src)
+        env, attrs = _py_env(defn, src, module_env)
+        if cls:
+            attrs = {**class_attrs.get(cls, {}), **attrs}
         out.append(
             Symbol(
                 file=path,
@@ -339,6 +504,7 @@ def _parse_py(path, src, lang):
                 signature=_signature(source),
                 calls=calls,
                 member_only=_member_only(calls, direct),
+                typed_calls=_typed_calls(defn, src, env, attrs, "python"),
                 decorators=decorators(outer),
                 exported=not name.startswith("_") or (name.startswith("__") and name.endswith("__")),
                 entry=bool(_ROUTE.search(source)) or name == "main",
@@ -350,14 +516,24 @@ def _parse_py(path, src, lang):
         head = src[outer.start_byte : body.start_byte if body is not None else defn.end_byte].decode("utf8", "replace")
         own = []
         calls, direct = [], set()
+        attrs: dict[str, str] = {}
         for m in body.named_children if body is not None else []:
             md, _ = unwrap(m)
             if md is not None and md.type == "function_definition":
+                attrs.update(_py_env(md, src, module_env)[1])
                 continue
+            if m.type in ("expression_statement", "assignment"):  # `repo: Repo` or `repo = Repo()` at class level
+                for n in ([m] if m.type == "assignment" else m.named_children):
+                    if n.type == "assignment" and n.child_by_field_name("left") is not None and n.child_by_field_name("left").type == "identifier":
+                        ann = n.child_by_field_name("type")
+                        t = _type_name(_text(ann, src)) if ann is not None else _ctor(n.child_by_field_name("right"), src)
+                        if t:
+                            attrs[_text(n.child_by_field_name("left"), src)] = t
             own.append(_text(m, src))
             c, d = _py_calls(m, src)
             calls += c
             direct |= d
+        class_attrs[cname] = attrs
         bases = []
         sup = defn.child_by_field_name("superclasses")
         for a in sup.named_children if sup is not None else []:

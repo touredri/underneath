@@ -1,0 +1,48 @@
+{
+  "about": "Receiver types from annotations and self attributes; a base-class method; requests.Session.get and dict.get link nothing",
+  "concepts": {
+    "expected": [],
+    "allowed": [
+      "py.comprehension"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Signup.register",
+        "BaseRepo.save",
+        "calls"
+      ],
+      [
+        "Signup.register",
+        "Mailer.send",
+        "calls"
+      ],
+      [
+        "check",
+        "UserRepo.find",
+        "calls"
+      ],
+      [
+        "Signup.__init__",
+        "Mailer",
+        "calls"
+      ]
+    ],
+    "forbidden": [
+      [
+        "check",
+        "Mailer.get",
+        "calls"
+      ],
+      [
+        "Signup.register",
+        "Mailer.get",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 6
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "about": "TS receiver types: constructor parameter property, field, local `new`; a Map is not our Store",
+  "concepts": {
+    "expected": [
+      "js.class"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "ProfileService.load",
+        "Api.get",
+        "calls"
+      ],
+      [
+        "ProfileService.load",
+        "Store.set",
+        "calls"
+      ],
+      [
+        "ProfileService.load",
+        "Repo.find",
+        "calls"
+      ],
+      [
+        "ProfileService.load",
+        "Repo",
+        "calls"
+      ]
+    ],
+    "complete": true
+  },
+  "limits": {
+    "context": 6
+  }
+}

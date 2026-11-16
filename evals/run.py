@@ -10,7 +10,8 @@ own `before/` and `after/` folders or a `"source"` pointing at an example.
       "concepts": {"expected": [...], "allowed": [...]},
       "edges": {"expected": [["from", "to", "calls"], ...], "forbidden": [[...]], "complete": true},
       "status": {"Label": "moved"},               # optional
-      "context": {"expected": [...], "forbidden": [...]}   # optional: unchanged functions drawn
+      "context": {"expected": [...], "forbidden": [...]},  # optional: unchanged functions drawn
+      "limits": {"context": 6}                    # optional: budgets, to test links beyond the default 3
     }
 
 Concepts are every concept detected on the drawn changed functions (the five
@@ -28,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from fnmatch import fnmatch
 import sys
 from pathlib import Path
 
@@ -49,7 +51,7 @@ def _folders(case: Path, spec: dict) -> tuple[Path, Path]:
 
 def _graph(case: Path, spec: dict, catalogue) -> dict:
     before, after = _folders(case, spec)
-    return build(from_dirs(before, after), catalogue, {})
+    return build(from_dirs(before, after), catalogue, {}, spec.get("limits"))
 
 
 def evaluate(case: Path, catalogue) -> dict:
@@ -136,12 +138,16 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--json", action="store_true", help="print the full results as JSON")
     p.add_argument("--show", metavar="CASE", help="print what the tool sees for one case")
+    p.add_argument("--only", metavar="GLOB", help="run only the cases whose name matches, e.g. 'real-*'")
+    p.add_argument("--skip", metavar="GLOB", help="skip the cases whose name matches")
     a = p.parse_args(argv)
     catalogue = load_concepts(ROOT / "references")
     if a.show:
         show(CASES / a.show, catalogue)
         return 0
-    results = [evaluate(c, catalogue) for c in sorted(CASES.iterdir()) if (c / "expected.json").exists()]
+    cases = [c for c in sorted(CASES.iterdir()) if (c / "expected.json").exists()]
+    cases = [c for c in cases if (not a.only or fnmatch(c.name, a.only)) and not (a.skip and fnmatch(c.name, a.skip))]
+    results = [evaluate(c, catalogue) for c in cases]
     total = summarize(results)
     fails = check(total, json.loads(THRESHOLDS.read_text()) if THRESHOLDS.exists() else {})
     if a.json:

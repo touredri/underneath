@@ -178,7 +178,7 @@ def neighbour_files(scope: Scope, changed: list[Symbol], suffixes: dict[str, lis
         callers[s.name.split(".")[-1]].add(fam)
         if "." in s.qualname:
             callers[s.qualname.split(".")[0]].add(fam)  # a constructor is called by its class name
-        for n in (*s.calls, *s.renders, *s.decorators, *s.bases):
+        for n in (*s.calls, *s.renders, *s.decorators, *s.bases, *(t for _, t in s.typed_calls)):
             callees[n].add(fam)
     names = {n for n in set(callers) | set(callees) if _IDENT.fullmatch(n) and n not in _RESERVED}
 
@@ -345,10 +345,37 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         same_family = [c for c in cands if (c.lang == "python") == (src.lang == "python") and c.lang != "sql"]
         return same_family[0] if len(same_family) == 1 else None
 
+    def pick(src: Symbol, cands: list[Symbol]) -> Symbol | None:
+        cands = sorted(cands, key=lambda c: (c.file, c.start_line))
+        same = [c for c in cands if c.file == src.file]
+        imported = [c for c in cands if c.file in imports.get(src.file, set())]
+        return (same or imported or (cands if len(cands) == 1 else [None]))[0]
+
+    def method_of(src: Symbol, cls: str, meth: str, depth: int = 0) -> Symbol | None:
+        """`cls.meth`, or the method a base class provides."""
+        hit = pick(src, [c for c in by_name.get(meth, []) if c.qualname.split("#")[0] == f"{cls}.{meth}"])
+        if hit is not None or depth >= 4:
+            return hit
+        klass = pick(src, [c for c in by_name.get(cls, []) if c.kind == "class"])
+        for base in klass.bases if klass is not None else []:
+            hit = method_of(klass, base, meth, depth + 1)
+            if hit is not None:
+                return hit
+        return None
+
     edges: set[tuple[str, str, str]] = set()
     for s in syms.values():
+        # `cache.get(k)` with `cache: ReportCache`: the type says which method it is.
+        typed = set()
+        for meth, cls in s.typed_calls:
+            typed.add(meth)
+            t = method_of(s, cls, meth)
+            if t is not None and t.key != s.key:
+                edges.add((s.key, t.key, "calls"))
         # `rows.get(k)` or `late.push(x)` on some object: the name alone cannot say it is ours.
         guess = set(s.member_only) & COMMON_METHODS
+        # A typed receiver whose class is not ours (`session: requests.Session`) links nothing by name either.
+        guess |= typed & set(s.member_only)
         for name in set(s.calls) - guess:
             t = resolve(s, name)
             if t is not None:
