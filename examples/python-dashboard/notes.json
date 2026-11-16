@@ -1,0 +1,24 @@
+{
+  "nodes": {
+    "n1": {"summary": "Runs the orders and profile queries at the same time, then summarizes; results are cached for 30 s per user."},
+    "n2": {"summary": "New GET /dashboard/{user_id} route; delegates everything to load_dashboard."},
+    "n3": {"summary": "Builds a decorator that keeps each result in a dict for `ttl` seconds, keyed by the call arguments."},
+    "n4": {"summary": "Opens a session, fetches the user's orders, closes the session."},
+    "n5": {"summary": "Opens its own session and fetches the profile, in parallel with fetch_orders."},
+    "n6": {"summary": "Counts orders and collects the ids of those over 100."}
+  },
+  "concepts": {
+    "py.mutableDefault": {"here": "highlights=[] is created once: every dashboard call appends to the same list, so ids from other users leak in."},
+    "py.asyncAwait": {"here": "Each await hands control back to the loop while the database answers."},
+    "py.decorator": {"here": "@cached(ttl=30) replaces load_dashboard with the wrapper built in cache.py."},
+    "py.contextManager": {"here": "get_session closes the session even if the query raises."},
+    "py.gather": {"here": "Both queries run concurrently: total time is the slower one, not the sum. One failure cancels the result."}
+  },
+  "inferred_edges": [
+    {"from": "n3", "to": "n1", "label": "wraps"}
+  ],
+  "watch": [
+    {"node": "n6", "line": 17, "text": "highlights=[] is shared across calls: use None, create the list inside"}
+  ],
+  "fundamental": {"id": "event-loop", "text": "gather starts both queries, then the loop switches between them at each await. That is why the two sessions overlap in time."}
+}

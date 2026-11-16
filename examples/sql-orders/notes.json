@@ -1,0 +1,21 @@
+{
+  "nodes": {
+    "n1": {"summary": "One row per user with paid order count and lifetime value; meant to keep users with no orders at 0."},
+    "n2": {"summary": "Ranks users by lifetime value, highest first, built on user_order_stats."},
+    "n3": {"summary": "Index on orders(user_id, created_at): fast lookups by user, and by user plus date range."}
+  },
+  "concepts": {
+    "sql.leftJoinWhere": {"here": "WHERE o.status = 'paid' drops users without orders (o.status is NULL), so COALESCE(..., 0) never fires."},
+    "sql.aggregation": {"here": "GROUP BY u.id, u.name folds each user's orders into one row; COUNT(o.id) skips the NULL rows."},
+    "sql.null": {"here": "COALESCE turns the NULL sum of a user without orders into 0."},
+    "sql.window": {"here": "RANK() OVER (ORDER BY lifetime_value DESC) numbers rows without collapsing them; ties share a rank."},
+    "sql.index": {"here": "user_id first: helps WHERE user_id = ?, and the join in user_order_stats."}
+  },
+  "inferred_edges": [
+    {"from": "sql.leftJoinWhere", "to": "sql.null", "label": "defeats"}
+  ],
+  "watch": [
+    {"node": "n1", "line": 11, "text": "o.status = 'paid' in WHERE undoes the LEFT JOIN: move it into ON"}
+  ],
+  "fundamental": {"id": "three-valued-logic", "text": "For a user with no orders, o.status is NULL, and NULL = 'paid' is unknown, not false. WHERE keeps only true rows, so that user vanishes."}
+}

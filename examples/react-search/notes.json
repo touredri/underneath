@@ -1,0 +1,27 @@
+{
+  "nodes": {
+    "n1": {"summary": "Holds the query, waits 300 ms after the last keystroke, then fetches, cancels stale requests and sorts the results."},
+    "n2": {"summary": "Now renders SearchUsers instead of an empty UserList."},
+    "n3": {"summary": "Returns the value only once it has stopped changing for `delay` ms."},
+    "n4": {"summary": "GETs /api/users?q= with an abort signal; throws on a non-2xx status."},
+    "n5": {"summary": "Returns a sorted copy by name or newest first; never mutates the input."}
+  },
+  "concepts": {
+    "react.effectCleanup": {"here": "Two cleanups: one clears the debounce timer, the other aborts the previous search before the next one starts."},
+    "react.useEffect": {"here": "The search effect re-runs only when debouncedQuery changes, not on every keystroke."},
+    "react.useState": {"here": "query changes on each keystroke; results and sortKey drive what UserList shows."},
+    "web.AbortController": {"here": "Each new search aborts the previous fetch, so a slow old answer cannot overwrite a newer one."},
+    "react.useMemo": {"here": "Re-sorts only when results or sortKey change, not when the user types."}
+  },
+  "inferred_edges": [
+    {"from": "n3", "to": "n4", "label": "triggers"},
+    {"from": "react.effectCleanup", "to": "web.AbortController", "label": "aborts"}
+  ],
+  "watch": [
+    {"node": "n1", "line": 21, "text": "setResults after abort: guarded by signal.aborted, OK"}
+  ],
+  "fundamental": {
+    "id": "closures",
+    "text": "The search effect captures debouncedQuery from the render that created it. The dependency array tells React when to make a new one."
+  }
+}
