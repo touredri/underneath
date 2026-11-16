@@ -97,6 +97,10 @@ def _git_scope(example: str):
     """A throwaway git repo: `before` committed, `after` in the working tree."""
     from diffscope import from_git
 
+    return from_git(_git_repo(example), "HEAD")
+
+
+def _git_repo(example: str) -> Path:
     repo = Path(tempfile.mkdtemp(prefix=f"underneath-git-{example}-"))
     shutil.copytree(EX / example / "before", repo, dirs_exist_ok=True)
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
@@ -107,7 +111,7 @@ def _git_scope(example: str):
         if p.name != ".git":
             shutil.rmtree(p) if p.is_dir() else p.unlink()
     shutil.copytree(EX / example / "after", repo, dirs_exist_ok=True)
-    return from_git(repo, "HEAD")
+    return repo
 
 
 def _full_parse_graph(scope):
@@ -259,6 +263,73 @@ def test_gaps():
     assert all("/underneath deeper " in l for l in lines[1:])
     counts_ = [int(l.split("×")[0].split()[-1]) for l in lines[1:]]
     assert counts_ == sorted(counts_, reverse=True)
+
+
+# ------------------------------------------------------------ stop hook ---
+
+HOOK = ROOT / "scripts" / "stop_hook.py"
+
+
+def _transcript(tmp: Path, *entries) -> str:
+    """A Claude Code transcript: ("prompt", text) or ("tool", name) entries, in order."""
+    lines = []
+    for kind, value in entries:
+        if kind == "prompt":
+            lines.append({"type": "user", "message": {"role": "user", "content": value}})
+        else:
+            lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "t1", "name": value, "input": {}}]}})
+            lines.append({"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}})
+    path = tmp / "transcript.jsonl"
+    path.write_text("\n".join(json.dumps(l) for l in lines))
+    return str(path)
+
+
+def _hook(repo: Path, transcript: str | None, active: bool = False) -> dict | None:
+    payload = {"session_id": "s", "cwd": str(repo), "hook_event_name": "Stop", "stop_hook_active": active}
+    if transcript:
+        payload["transcript_path"] = transcript
+    r = subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True, check=True)
+    return json.loads(r.stdout) if r.stdout.strip() else None
+
+
+def test_stop_hook_asks_for_the_card_once():
+    repo = _git_repo("react-search")
+    edited = _transcript(repo.parent, ("prompt", "add a user search"), ("tool", "Write"), ("tool", "Edit"))
+    answer = _hook(repo, edited)
+    assert answer and answer["decision"] == "block"
+    assert "NODES" in answer["reason"] and "SearchUsers" in answer["reason"]  # the brief rides along
+    assert "do not run extract again" in answer["reason"]
+    assert '"stop_hook": false' in answer["reason"]
+    assert _hook(repo, edited) is None  # same graph: asked already, never nag
+    # The agent writes notes and renders: the registry now holds this graph, still quiet.
+    shutil.copy(EX / "react-search" / "notes.json", repo / ".underneath" / "notes.json")
+    subprocess.run([sys.executable, CLI, "render"], cwd=repo, capture_output=True, check=True)
+    assert _hook(repo, edited) is None
+    # A new change in a later turn asks again.
+    (repo / "src" / "lib" / "sort.ts").write_text((repo / "src" / "lib" / "sort.ts").read_text() + (
+        "\nexport function sortByEmail(users) {\n  return [...users].sort((a, b) => a.email.localeCompare(b.email));\n}\n"
+        "\nexport function sortByAge(users) {\n  return [...users].sort((a, b) => a.age - b.age);\n}\n"))
+    assert _hook(repo, edited)["decision"] == "block"
+
+
+def test_stop_hook_stays_quiet():
+    repo = _git_repo("react-search")
+    edited = _transcript(repo.parent, ("prompt", "add a user search"), ("tool", "Edit"))
+    assert _hook(repo, edited, active=True) is None  # already continuing because of a Stop hook: no loop
+    talked = _transcript(repo.parent, ("prompt", "add it"), ("tool", "Edit"), ("prompt", "what does it do?"), ("tool", "Read"))
+    assert _hook(repo, talked) is None  # this turn edited nothing
+    (repo / ".underneath").mkdir(exist_ok=True)
+    (repo / ".underneath" / "config.json").write_text(json.dumps({"stop_hook": False}))
+    assert _hook(repo, edited) is None  # switched off
+    small = _git_repo("react-search")
+    shutil.rmtree(small / "src")
+    shutil.copytree(EX / "react-search" / "before" / "src", small / "src")
+    (small / "src" / "App.tsx").write_text((small / "src" / "App.tsx").read_text() + "\n// tweak\n")
+    assert _hook(small, edited) is None  # small change
+    outside = Path(tempfile.mkdtemp(prefix="underneath-nogit-"))
+    assert _hook(outside, edited) is None  # not a git repository
 
 
 if __name__ == "__main__":

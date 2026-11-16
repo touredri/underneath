@@ -1,0 +1,14 @@
+{
+  "name": "underneath",
+  "description": "underneath: see what the AI just wrote, and what it rests on.",
+  "owner": {
+    "name": "Drissa Toure"
+  },
+  "plugins": [
+    {
+      "name": "underneath",
+      "source": "./",
+      "description": "A 5-line card and a map of what the agent changed, the concepts it uses and the fundamental underneath."
+    }
+  ]
+}

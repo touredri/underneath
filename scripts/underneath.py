@@ -33,10 +33,11 @@ def _use_skill_venv() -> None:
         return
     except ImportError:
         pass
-    venv = HERE.parent / ".venv"
-    venv_py = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    if venv_py.exists() and Path(sys.prefix).resolve() != venv.resolve():
-        os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
+    # Next to the skill (a git clone), or in the user's home (a plugin, whose folder changes on update).
+    for venv in (HERE.parent / ".venv", Path.home() / ".underneath" / "venv"):
+        venv_py = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if venv_py.exists() and Path(sys.prefix).resolve() != venv.resolve():
+            os.execv(str(venv_py), [str(venv_py), str(Path(__file__).resolve()), *sys.argv[1:]])
     # Otherwise parse.py explains how to install.
 
 

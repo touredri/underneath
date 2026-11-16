@@ -9,6 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from concepts import Fundamental
+from ids import change_id
 
 CAPS = {"summary": 140, "here": 160, "watch": 90, "fundamental": 220, "label": 18}
 MAX_INFERRED = 4
@@ -519,4 +520,5 @@ def update_registry(registry: dict, graph: dict, graph_id: str) -> dict:
         entry["seen"] += 1
         entry["last_seen"] = today
     registry["last_graph"] = graph_id
+    registry["last_change"] = change_id(graph)
     return registry

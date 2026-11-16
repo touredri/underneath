@@ -16,8 +16,8 @@ try:
     from tree_sitter_language_pack import get_parser
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
-        "underneath needs tree-sitter. Install it with:\n"
-        "  pip install tree-sitter tree-sitter-language-pack"
+        "underneath needs tree-sitter. Install it once in a virtualenv the script finds by itself:\n"
+        "  python3 -m venv ~/.underneath/venv && ~/.underneath/venv/bin/pip install tree-sitter tree-sitter-language-pack"
     ) from exc
 
 LANG_BY_EXT = {

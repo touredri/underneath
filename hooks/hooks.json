@@ -1,0 +1,16 @@
+{
+  "description": "underneath: ask for the card when the agent changed code in this turn",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/stop_hook.py\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

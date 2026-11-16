@@ -61,6 +61,12 @@ You do not decide what is in the map. The syntax tree does. You only explain.
 
 Write the notes in English, unless `.underneath/config.json` contains `"language": "<code>"`, in which case write `summary`, `here`, `watch` and `fundamental.text` in that language.
 
+## When the Stop hook asks for the card
+
+Installed as a Claude Code plugin, underneath has a `Stop` hook. When a turn edited code, the hook runs `extract` and sends you its brief with the instruction to produce the card. Follow it from step 3 of the steps above (do not run extract again), render, show the card, and stop. The hook asks once per change and never while you are already answering it.
+
+If the user says they do not want the card at the end of each task, set `"stop_hook": false` in `.underneath/config.json` (create the file if needed; keep its other keys). `/underneath` still works by hand.
+
 ## Do not
 
 - Do not edit the user's code as part of this skill. If a watch item is a real bug, mention it in your one sentence and offer to fix it.

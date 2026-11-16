@@ -40,3 +40,19 @@ The agent only explains. It never adds functions or concepts: those come from th
 - `fundamental`: exactly one. Choose the candidate that explains the most of this change.
 - Skip any field you have nothing true to say about. Missing summaries fall back to the signature.
 - Write in English unless `.underneath/config.json` sets another `language`.
+
+## config.json
+
+`.underneath/config.json` is optional. All keys:
+
+```json
+{
+  "language": "fr",
+  "stop_hook": false,
+  "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 }
+}
+```
+
+- `language`: language of the notes (default English).
+- `stop_hook`: `false` turns off the Claude Code plugin's Stop hook for this project (default on).
+- `limits`: map budgets; `min_lines` is the size under which a change with nothing new is skipped.
