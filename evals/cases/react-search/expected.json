@@ -1,0 +1,52 @@
+{
+  "about": "React search: debounce hook, fetch with AbortController, memoized sort",
+  "source": "examples/react-search",
+  "concepts": {
+    "expected": [
+      "react.useState",
+      "react.useEffect",
+      "react.effectCleanup",
+      "react.useMemo",
+      "react.customHook",
+      "web.AbortController",
+      "web.fetch",
+      "web.timers",
+      "js.asyncAwait"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "App",
+        "SearchUsers",
+        "renders"
+      ],
+      [
+        "SearchUsers",
+        "useDebounce",
+        "calls"
+      ],
+      [
+        "SearchUsers",
+        "searchUsers",
+        "calls"
+      ],
+      [
+        "SearchUsers",
+        "sortUsers",
+        "calls"
+      ],
+      [
+        "SearchUsers",
+        "UserList",
+        "renders"
+      ],
+      [
+        "App",
+        "Header",
+        "renders"
+      ]
+    ],
+    "complete": true
+  }
+}

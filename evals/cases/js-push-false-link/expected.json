@@ -1,0 +1,17 @@
+{
+  "about": "`late.push(id)` on an array is not Queue.push",
+  "concepts": {
+    "expected": []
+  },
+  "edges": {
+    "expected": [],
+    "forbidden": [
+      [
+        "lateOrders",
+        "Queue.push",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

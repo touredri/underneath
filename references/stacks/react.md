@@ -128,7 +128,10 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 ## AbortController
 - id: web.AbortController
 - detect: regex new\s+AbortController
-- detect: regex \bsignal\b
+- detect: regex \bAbortSignal\b
+- detect: regex \.signal\b
+- detect: regex \bsignal\.(aborted|reason|throwIfAborted|addEventListener)\b
+- detect: regex \bfetch\s*\([^;]*?\bsignal\b
 - fundamental: promises
 - what: Cancels an in-flight request so an old answer cannot overwrite a newer one.
 - pitfalls: Setting state after the request was aborted; not treating the AbortError as a normal outcome.

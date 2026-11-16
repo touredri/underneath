@@ -64,6 +64,7 @@ class Symbol:
     renders: list[str] = field(default_factory=list)
     refs: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
+    member_only: list[str] = field(default_factory=list)  # names only ever called as `other.name()`, never bare or on self/this
     exported: bool = False
     entry: bool = False
     label: str = ""
@@ -107,8 +108,15 @@ def _signature(source: str) -> str:
 _JS_FUNC_VALUES = {"arrow_function", "function_expression", "function", "generator_function"}
 
 
+_OWN = {"this", "self", "cls", "super"}
+
+
+def _member_only(calls: list[str], direct: set[str]) -> list[str]:
+    return sorted(set(calls) - direct)
+
+
 def _js_calls(node, src):
-    calls, renders = [], []
+    calls, renders, direct = [], [], set()
     for n in _walk(node):
         if n.type == "call_expression":
             fn = n.child_by_field_name("function")
@@ -116,10 +124,14 @@ def _js_calls(node, src):
                 continue
             if fn.type == "identifier":
                 calls.append(_text(fn, src))
+                direct.add(calls[-1])
             elif fn.type == "member_expression":
                 prop = fn.child_by_field_name("property")
+                obj = fn.child_by_field_name("object")
                 if prop is not None:
                     calls.append(_text(prop, src))
+                    if obj is not None and obj.type in ("this", "super"):
+                        direct.add(calls[-1])
         elif n.type == "new_expression":
             ctor = n.child_by_field_name("constructor")
             if ctor is not None and ctor.type == "identifier":
@@ -131,7 +143,7 @@ def _js_calls(node, src):
             t = _text(nm, src).split(".")[-1]
             if t[:1].isupper():
                 renders.append(t)
-    return calls, renders
+    return calls, renders, direct
 
 
 def _has_jsx(node) -> bool:
@@ -167,7 +179,7 @@ def _parse_js(path, src, lang):
 
     def add(name, qual, node, src_node, exported, kind=None):
         source = _text(src_node, src)
-        calls, renders = _js_calls(node, src)
+        calls, renders, direct = _js_calls(node, src)
         k = kind or _js_kind(name, node)
         out.append(
             Symbol(
@@ -182,6 +194,7 @@ def _parse_js(path, src, lang):
                 signature=_signature(source),
                 calls=calls,
                 renders=renders,
+                member_only=_member_only(calls, direct),
                 exported=exported,
                 entry=exported and k == "component",
             )
@@ -240,7 +253,7 @@ _ROUTE = re.compile(r"@\w+\.(route|get|post|put|patch|delete|websocket|task|comm
 
 
 def _py_calls(node, src):
-    calls = []
+    calls, direct = [], set()
     for n in _walk(node):
         if n.type == "call":
             fn = n.child_by_field_name("function")
@@ -248,11 +261,16 @@ def _py_calls(node, src):
                 continue
             if fn.type == "identifier":
                 calls.append(_text(fn, src))
+                direct.add(calls[-1])
             elif fn.type == "attribute":
                 a = fn.child_by_field_name("attribute")
+                obj = fn.child_by_field_name("object")
                 if a is not None:
                     calls.append(_text(a, src))
-    return calls
+                    receiver = _text(obj, src) if obj is not None else ""
+                    if receiver in _OWN or receiver == "super()":
+                        direct.add(calls[-1])
+    return calls, direct
 
 
 def _parse_py(path, src, lang):
@@ -282,6 +300,7 @@ def _parse_py(path, src, lang):
         name = _text(nm, src)
         qual = f"{cls}.{name}" if cls else name
         source = _text(outer, src)
+        calls, direct = _py_calls(defn, src)
         out.append(
             Symbol(
                 file=path,
@@ -293,7 +312,8 @@ def _parse_py(path, src, lang):
                 end_line=outer.end_point[0] + 1,
                 source=source,
                 signature=_signature(source),
-                calls=_py_calls(defn, src),
+                calls=calls,
+                member_only=_member_only(calls, direct),
                 decorators=decorators(outer),
                 exported=not name.startswith("_") or (name.startswith("__") and name.endswith("__")),
                 entry=bool(_ROUTE.search(source)) or name == "main",

@@ -93,7 +93,7 @@ Same format as `react.md`. Rules run on each statement's text, case-insensitivel
 
 ## Constraints
 - id: sql.constraints
-- detect: regex \b(PRIMARY\s+KEY|UNIQUE|CHECK\s*\(|NOT\s+NULL)\b
+- detect: regex \b(PRIMARY\s+KEY|UNIQUE|CHECK\s*\(|(?<!\bIS\s)NOT\s+NULL)\b
 - fundamental: set-theory
 - what: Rules the database enforces on every write, whatever the application does.
 - pitfalls: Adding a constraint to a large table can lock it while existing rows are checked.

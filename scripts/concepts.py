@@ -113,8 +113,15 @@ def load_fundamentals(ref_dir: Path) -> dict[str, Fundamental]:
     return out
 
 
+_PY_TRIPLE = re.compile(r"(?s)[rbfuRBFU]{0,2}(\"\"\"|''').*?\1")
+_PY_STRING = re.compile(r"[rbfuRBFU]{0,2}(\"|')(?:\\.|(?!\1)[^\\\n])*\1")
+
+
 def _strip_comments(source: str, lang: str) -> str:
+    """Comments, and in Python string literals too: a docstring that says "await" is not async code."""
     if lang == "python":
+        source = _PY_TRIPLE.sub('""', source)
+        source = _PY_STRING.sub('""', source)
         source = re.sub(r"(?m)#.*$", "", source)
     elif lang == "sql":
         source = re.sub(r"--.*$", "", source, flags=re.MULTILINE)

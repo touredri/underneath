@@ -1,0 +1,17 @@
+{
+  "about": "TypeScript generic hook with useReducer, fetch and abort on cleanup",
+  "concepts": {
+    "expected": [
+      "react.customHook",
+      "react.useReducer",
+      "react.useEffect",
+      "react.effectCleanup",
+      "web.fetch",
+      "web.AbortController"
+    ]
+  },
+  "edges": {
+    "expected": [],
+    "complete": true
+  }
+}

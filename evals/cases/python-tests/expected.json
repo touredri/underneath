@@ -1,0 +1,19 @@
+{
+  "about": "Tests are not nodes; their `with pytest.raises` is not a concept of the change",
+  "source": "examples/python-tests",
+  "concepts": {
+    "expected": [
+      "py.exceptions"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "total",
+        "apply_discount",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

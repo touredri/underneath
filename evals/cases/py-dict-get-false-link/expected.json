@@ -1,0 +1,17 @@
+{
+  "about": "`allowed.get(name)` on a dict is not ReportCache.get. (CACHE.get, a real instance, is not linked either: precision first)",
+  "concepts": {
+    "expected": []
+  },
+  "edges": {
+    "expected": [],
+    "forbidden": [
+      [
+        "available",
+        "ReportCache.get",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

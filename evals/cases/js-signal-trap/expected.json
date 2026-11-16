@@ -1,0 +1,16 @@
+{
+  "about": "A variable named `signal` is not an AbortController",
+  "concepts": {
+    "expected": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "crossSignal",
+        "average",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

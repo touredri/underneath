@@ -1,0 +1,24 @@
+{
+  "about": "Promise.all with await, and a polling hook with interval cleanup",
+  "concepts": {
+    "expected": [
+      "js.promiseAll",
+      "js.asyncAwait",
+      "react.customHook",
+      "react.useState",
+      "react.useEffect",
+      "react.effectCleanup",
+      "web.timers"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "loadDashboard",
+        "getJson",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

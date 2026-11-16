@@ -1,0 +1,42 @@
+{
+  "about": "Components moved or extracted to their own files are not new",
+  "source": "examples/react-move",
+  "concepts": {
+    "expected": [
+      "react.useState",
+      "react.callbackProps",
+      "react.keys"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Dashboard",
+        "EmptyState",
+        "renders"
+      ],
+      [
+        "Dashboard",
+        "StatCard",
+        "renders"
+      ],
+      [
+        "Dashboard",
+        "TripList",
+        "renders"
+      ],
+      [
+        "Dashboard",
+        "DashboardHeader",
+        "renders"
+      ]
+    ],
+    "complete": true
+  },
+  "status": {
+    "StatCard": "moved",
+    "DashboardHeader": "moved",
+    "TripList": "modified",
+    "EmptyState": "new"
+  }
+}

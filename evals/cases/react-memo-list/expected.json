@@ -1,0 +1,24 @@
+{
+  "about": "Memoized list: memo, useMemo, useCallback, useRef, keys",
+  "concepts": {
+    "expected": [
+      "react.memo",
+      "react.useMemo",
+      "react.useCallback",
+      "react.useRef",
+      "react.useState",
+      "react.keys",
+      "react.callbackProps"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Products",
+        "ProductRow",
+        "renders"
+      ]
+    ],
+    "complete": true
+  }
+}

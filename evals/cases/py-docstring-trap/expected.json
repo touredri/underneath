@@ -1,0 +1,10 @@
+{
+  "about": "Docstrings and strings that say await, yield, lambda or try: are not code",
+  "concepts": {
+    "expected": []
+  },
+  "edges": {
+    "expected": [],
+    "complete": true
+  }
+}

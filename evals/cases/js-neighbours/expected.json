@@ -1,0 +1,27 @@
+{
+  "about": "A name defined in four files links nothing; a unique import does",
+  "source": "examples/js-neighbours",
+  "concepts": {
+    "expected": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "addItem",
+        "formatPrice",
+        "calls"
+      ],
+      [
+        "startCheckout",
+        "addItem",
+        "calls"
+      ],
+      [
+        "startCheckout",
+        "emptyCart",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

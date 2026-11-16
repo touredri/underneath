@@ -1,0 +1,18 @@
+{
+  "about": "Generator, comprehensions, context manager, property and dunders; a decorated method is not a closure",
+  "concepts": {
+    "expected": [
+      "py.generator",
+      "py.comprehension",
+      "py.contextManager",
+      "py.property",
+      "py.dunder",
+      "py.varargs",
+      "py.exceptions"
+    ]
+  },
+  "edges": {
+    "expected": [],
+    "complete": true
+  }
+}

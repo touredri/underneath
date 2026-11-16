@@ -2,8 +2,8 @@
 """Claude Code `Stop` hook: ask the agent for the underneath card when it changed code.
 
 Reads the hook input on stdin and prints nothing (let Claude stop) or
-{"decision": "block", "reason": ...} with the extract brief, so the agent
-writes notes.json, renders and shows the card before it finishes.
+{"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": brief}},
+so the agent writes notes.json, renders and shows the card before it finishes.
 
 It stays quiet when:
 - `stop_hook_active` is true (the agent is already continuing because of a Stop hook);
@@ -124,7 +124,9 @@ def decide(hook_input: dict) -> dict | None:
         'If the developer does not want this, they can set "stop_hook": false in .underneath/config.json.\n\n'
         + brief
     )
-    return {"decision": "block", "reason": reason}
+    # additionalContext keeps Claude going like {"decision": "block"}, with the same loop guards
+    # (stop_hook_active, the continuation cap), but shows as "Stop hook feedback", not as an error.
+    return {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": reason}}
 
 
 def _missing_dependency(out: Path) -> dict | None:

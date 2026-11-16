@@ -17,7 +17,7 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 
 ## Closures
 - id: py.closure
-- detect: regex \n[ \t]+def\s+\w+\(
+- detect: regex \bdef\s+\w+\([^)]*\)[^\n]*:[ \t]*\n(?:.*\n)*?[ \t]+(?:async\s+)?def\s+\w+\(
 - fundamental: closures
 - what: An inner function keeps access to the variables of the function that created it.
 - pitfalls: Late binding in loops (every inner function sees the last loop value); assigning to an outer variable needs `nonlocal`.

@@ -1,0 +1,39 @@
+{
+  "about": "SQL views: LEFT JOIN undone by WHERE, aggregation, window function, index",
+  "source": "examples/sql-orders",
+  "concepts": {
+    "expected": [
+      "sql.outerJoin",
+      "sql.leftJoinWhere",
+      "sql.aggregation",
+      "sql.null",
+      "sql.window",
+      "sql.index"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "user_order_stats",
+        "orders",
+        "reads"
+      ],
+      [
+        "user_order_stats",
+        "users",
+        "reads"
+      ],
+      [
+        "top_customers",
+        "user_order_stats",
+        "reads"
+      ],
+      [
+        "idx_orders_user_created",
+        "orders",
+        "indexes"
+      ]
+    ],
+    "complete": true
+  }
+}

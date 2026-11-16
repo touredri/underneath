@@ -298,10 +298,12 @@ def test_stop_hook_asks_for_the_card_once():
     repo = _git_repo("react-search")
     edited = _transcript(repo.parent, ("prompt", "add a user search"), ("tool", "Write"), ("tool", "Edit"))
     answer = _hook(repo, edited)
-    assert answer and answer["decision"] == "block"
-    assert "NODES" in answer["reason"] and "SearchUsers" in answer["reason"]  # the brief rides along
-    assert "do not run extract again" in answer["reason"]
-    assert '"stop_hook": false' in answer["reason"]
+    assert answer and answer["hookSpecificOutput"]["hookEventName"] == "Stop"
+    reason = answer["hookSpecificOutput"]["additionalContext"]  # feedback, not a "hook error"
+    assert "decision" not in answer
+    assert "NODES" in reason and "SearchUsers" in reason  # the brief rides along
+    assert "do not run extract again" in reason
+    assert '"stop_hook": false' in reason
     assert _hook(repo, edited) is None  # same graph: asked already, never nag
     # The agent writes notes and renders: the registry now holds this graph, still quiet.
     shutil.copy(EX / "react-search" / "notes.json", repo / ".underneath" / "notes.json")
@@ -311,7 +313,7 @@ def test_stop_hook_asks_for_the_card_once():
     (repo / "src" / "lib" / "sort.ts").write_text((repo / "src" / "lib" / "sort.ts").read_text() + (
         "\nexport function sortByEmail(users) {\n  return [...users].sort((a, b) => a.email.localeCompare(b.email));\n}\n"
         "\nexport function sortByAge(users) {\n  return [...users].sort((a, b) => a.age - b.age);\n}\n"))
-    assert _hook(repo, edited)["decision"] == "block"
+    assert "additionalContext" in _hook(repo, edited)["hookSpecificOutput"]
 
 
 def test_stop_hook_stays_quiet():
@@ -330,6 +332,24 @@ def test_stop_hook_stays_quiet():
     assert _hook(small, edited) is None  # small change
     outside = Path(tempfile.mkdtemp(prefix="underneath-nogit-"))
     assert _hook(outside, edited) is None  # not a git repository
+
+
+# ---------------------------------------------------------------- evals ---
+
+
+def test_evals():
+    """evals/cases are the fixtures of every detection rule: zero invented concept, zero false link."""
+    r = subprocess.run([sys.executable, ROOT / "evals" / "run.py", "--json"], capture_output=True, text=True)
+    report = json.loads(r.stdout)
+    assert r.returncode == 0, report["fails"]
+    by = {c["case"]: c for c in report["cases"]}
+    # The traps that v0.1 fell into, one per fixed rule.
+    assert by["py-docstring-trap"]["concepts_found"] == 0  # strings are not code
+    assert by["py-generators"]["invented"] == []  # a decorated method is not a closure
+    assert by["sql-null-trap"]["invented"] == []  # IS NOT NULL is not a constraint
+    assert by["js-signal-trap"]["invented"] == []  # a variable named signal is not an AbortController
+    assert by["py-dict-get-false-link"]["false_links"] == [] and by["js-push-false-link"]["false_links"] == []
+    assert report["total"]["concept_precision"] == 1.0
 
 
 if __name__ == "__main__":

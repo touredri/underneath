@@ -1,0 +1,55 @@
+{
+  "about": "Async Python service: gather, async with, a caching decorator, a mutable default",
+  "source": "examples/python-dashboard",
+  "concepts": {
+    "expected": [
+      "py.asyncAwait",
+      "py.gather",
+      "py.contextManager",
+      "py.decorator",
+      "py.closure",
+      "py.varargs",
+      "py.mutableDefault"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "dashboard",
+        "load_dashboard",
+        "calls"
+      ],
+      [
+        "load_dashboard",
+        "cached",
+        "decorated by"
+      ],
+      [
+        "load_dashboard",
+        "fetch_orders",
+        "calls"
+      ],
+      [
+        "load_dashboard",
+        "fetch_profile",
+        "calls"
+      ],
+      [
+        "load_dashboard",
+        "summarize",
+        "calls"
+      ],
+      [
+        "fetch_orders",
+        "get_session",
+        "calls"
+      ],
+      [
+        "fetch_profile",
+        "get_session",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

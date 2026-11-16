@@ -1,0 +1,12 @@
+{
+  "about": "`IS NOT NULL` in a query is a NULL test, not a NOT NULL constraint",
+  "concepts": {
+    "expected": [
+      "sql.null"
+    ]
+  },
+  "edges": {
+    "expected": [],
+    "complete": true
+  }
+}

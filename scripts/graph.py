@@ -15,6 +15,15 @@ from parse import Symbol, parse_file
 LIMITS = {"changed": 7, "context": 3, "concepts": 5, "min_lines": 8}
 
 STATUS_SCORE = {"new": 3, "modified": 2, "moved": 0}
+# Methods of built-in collections, strings and promises. Called on an object other than
+# self/this, they are almost always the built-in one, never linked to a project method by name.
+COMMON_METHODS = set("""
+get items keys values append extend insert pop remove clear copy update setdefault add discard sort reverse
+index count join split strip lstrip rstrip replace lower upper startswith endswith format encode decode
+read write close find push shift unshift map filter reduce forEach findIndex some every includes indexOf
+slice splice concat entries has set delete then catch finally toString trim toLowerCase toUpperCase
+startsWith endsWith json text assign
+""".split())
 MOVE_SIMILARITY = 0.6  # below this, a same-named symbol elsewhere is a rewrite, not a move
 EXTRACT_SHARE = 0.9  # share of a new symbol's lines found in one old symbol to call it extracted
 
@@ -338,7 +347,9 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
 
     edges: set[tuple[str, str, str]] = set()
     for s in syms.values():
-        for name in set(s.calls):
+        # `rows.get(k)` or `late.push(x)` on some object: the name alone cannot say it is ours.
+        guess = set(s.member_only) & COMMON_METHODS
+        for name in set(s.calls) - guess:
             t = resolve(s, name)
             if t is not None:
                 edges.add((s.key, t.key, "calls"))
@@ -523,6 +534,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             "added_lines": total_added,
             "hidden_changed": [syms[k].label for k in hidden],
             "more_concepts": [catalogue[c].label for c in more_concepts],
+            "more_concept_ids": more_concepts,
             "truncated_universe": scope.truncated,
         },
         "skip": total_added < lim["min_lines"] and not any(status[k] == "new" for k in changed),

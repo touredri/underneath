@@ -1,0 +1,23 @@
+{
+  "about": "`self.total_items()` links to the method of the same class",
+  "concepts": {
+    "expected": [
+      "py.comprehension"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "Cart.add",
+        "Cart.total_items",
+        "calls"
+      ],
+      [
+        "Cart.clear",
+        "Cart.total_items",
+        "calls"
+      ]
+    ],
+    "complete": true
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "about": "CTE, window, inner join, subquery, DISTINCT and UNION",
+  "concepts": {
+    "expected": [
+      "sql.cte",
+      "sql.window",
+      "sql.aggregation",
+      "sql.innerJoin",
+      "sql.subquery",
+      "sql.distinct",
+      "sql.setOps"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "monthly_revenue",
+        "orders",
+        "reads"
+      ],
+      [
+        "monthly_revenue",
+        "customers",
+        "reads"
+      ],
+      [
+        "big_customers",
+        "customers",
+        "reads"
+      ],
+      [
+        "big_customers",
+        "orders",
+        "reads"
+      ]
+    ],
+    "complete": true
+  }
+}
