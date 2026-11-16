@@ -9,7 +9,7 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 
 ## Decorators
 - id: py.decorator
-- detect: regex ^\s*@(?!property\b|staticmethod\b|classmethod\b|dataclass\b)[\w.]+
+- detect: regex ^\s*@(?!property\b|staticmethod\b|classmethod\b|dataclass\b|(abc\.)?abstractmethod\b|(dataclasses\.)?dataclass\b)[\w.]+
 - fundamental: higher-order-functions
 - what: `@deco` above a function replaces it with `deco(function)`, wrapping extra behaviour around it.
 - pitfalls: Losing the function's name and docstring without `functools.wraps`; decorator order matters (bottom one applies first).
@@ -88,6 +88,22 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 - what: Generates `__init__`, `__repr__` and `__eq__` from annotated fields.
 - pitfalls: Mutable defaults need `field(default_factory=...)`; `frozen=True` if instances should not change.
 - relates: py.dunder
+
+## Inheritance
+- id: py.inheritance
+- detect: regex (?m)^[ \t]*class\s+\w+\s*\(\s*(?!object\s*\))(?!metaclass\b)[A-Za-z_][\w.]*
+- fundamental: object-model
+- what: The class gets the attributes and methods of its base and can override them; lookups walk the bases in order (the MRO).
+- pitfalls: Forgetting `super().__init__()`, so the base never sets its attributes; deep hierarchies where nobody knows which method actually runs.
+- relates: py.abstract, py.dunder
+
+## Abstract base classes
+- id: py.abstract
+- detect: regex \bABC\b|\bABCMeta\b|@(abc\.)?abstractmethod
+- fundamental: object-model
+- what: Declares methods every subclass must implement; the base itself cannot be instantiated.
+- pitfalls: A subclass that misses one abstract method fails only when instantiated, not at import.
+- relates: py.inheritance
 
 ## Special methods
 - id: py.dunder

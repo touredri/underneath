@@ -128,6 +128,22 @@ Each concept is one `##` section. The fields are read by `scripts/concepts.py`.
 - pitfalls: `fetch` does not reject on 404 or 500, check `response.ok`; unhandled rejections; no cancellation.
 - relates: web.AbortController, react.useEffect
 
+## Classes
+- id: js.class
+- detect: regex (?m)^\s*(export\s+(default\s+)?)?(abstract\s+)?class\s+[A-Za-z_$]
+- fundamental: object-model
+- what: A constructor and methods shared through the prototype; `this` is the instance the method is called on.
+- pitfalls: Passing `obj.method` as a callback loses `this`; fields initialised in the constructor run before subclass fields.
+- relates: js.inheritance
+
+## Class inheritance
+- id: js.inheritance
+- detect: regex \bclass\s+[\w$]+(\s*<[^>]*>)?\s+extends\s+[\w$.]+
+- fundamental: object-model
+- what: The class reuses its parent's methods through the prototype chain and can override them.
+- pitfalls: Using `this` before calling `super()` in a constructor throws; overriding without calling `super.method()` drops the parent's behaviour.
+- relates: js.class
+
 ## AbortController
 - id: web.AbortController
 - detect: regex new\s+AbortController

@@ -213,7 +213,7 @@ def test_minor_concepts_rank_last():
     assert shown == {"react.memo", "react.useMemo", "react.useCallback", "react.useRef", "react.useState"}, shown
     assert {"react.keys", "react.callbackProps"} <= set(g["summary"]["more_concept_ids"])  # still listed, one click away
     init = parse_file("a.py", "class A:\n    def __init__(self):\n        self.x = 1\n\n    def __len__(self):\n        return 1\n")
-    assert [detect(s, cat) for s in init] == [[], ["py.dunder"]]  # a constructor is not a special-method lesson
+    assert [(s.kind, detect(s, cat)) for s in init] == [("class", []), ("method", []), ("method", ["py.dunder"])]  # __init__ is no lesson
 
 
 # ------------------------------------------------------------ map, gaps ---
@@ -235,7 +235,8 @@ def test_map():
     card = _project("map", EX / "project-map", out)
     lines = card.strip().splitlines()
     assert len(lines) <= 5, card
-    assert lines[0].startswith("underneath map · 5 files · 7 functions · 12 concepts on 7 fundamentals"), lines[0]
+    assert lines[0].startswith("underneath map · 5 files · 7 functions · 13 concepts on 8 fundamentals"), lines[0]
+    assert "py.dataclass" in json.loads((out / "map.json").read_text())["concepts"]  # a decorator on a class counts now
     assert lines[1].startswith("  top   closures 4 · event loop 4"), lines[1]
     assert "⚠" in card and "api/app/services.py:4" in card  # risks surface on the project map too
     assert "/underneath gaps" in card
@@ -302,7 +303,7 @@ def test_gaps():
     card = _project("gaps", EX / "project-map", out)
     lines = card.strip().splitlines()
     assert len(lines) <= 5, card
-    assert lines[0] == "underneath gaps · 11 of 12 concepts in your code never marked known, most used first"
+    assert lines[0] == "underneath gaps · 12 of 13 concepts in your code never marked known, most used first"
     assert "useState" not in card  # marked known in the registry
     assert lines[1].startswith("  async / await (py)") and "3×" in lines[1]
     assert all("/underneath deeper " in l for l in lines[1:])

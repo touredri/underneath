@@ -1,0 +1,5 @@
+{
+  "about": "Classes are nodes: ABC, @dataclass on a class, inheritance edges, Square() links to the class",
+  "concepts": {"expected": ["py.abstract", "py.dataclass", "py.inheritance"]},
+  "edges": {"expected": [["Rect", "Shape", "inherits"], ["Square", "Rect", "inherits"], ["unit_square", "Square", "calls"]], "complete": true}
+}

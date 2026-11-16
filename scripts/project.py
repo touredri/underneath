@@ -47,7 +47,7 @@ def file_concepts(rel: str, text: str, catalogue: dict[str, Concept]) -> dict:
         for cid in detect(s, catalogue):
             counts[cid] += 1
             first.setdefault(cid, s.start_line)
-    return {"functions": len(syms), "concepts": dict(counts), "first": first}
+    return {"functions": sum(1 for s in syms if s.kind != "class"), "concepts": dict(counts), "first": first}
 
 
 _worker_catalogue: dict[str, Concept] | None = None

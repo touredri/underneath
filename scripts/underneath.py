@@ -116,7 +116,7 @@ def cmd_extract(a) -> int:
         if e["type"] != "uses":
             rel_out.setdefault((e["from"], e["type"]), []).append(e["to"])
             rel_in.setdefault((e["to"], e["type"]), []).append(e["from"])
-    passive = {"calls": "called by", "renders": "rendered by", "reads": "read by", "references": "referenced by", "indexes": "indexed by", "decorated by": "decorates"}
+    passive = {"calls": "called by", "renders": "rendered by", "reads": "read by", "references": "referenced by", "indexes": "indexed by", "decorated by": "decorates", "inherits": "inherited by"}
     for n in g["nodes"]:
         tag = f"{n['kind'].replace('_', ' ')} · {n['status']}" + (f" from {n['moved_from']}" if n.get("moved_from") else "") + (" · hub" if n["hub"] else "")
         lines.append(f"{n['id']:<4}{n['label']}  [{tag}]  {n['file']}:{n['line']}-{n['end_line']}")

@@ -1,0 +1,5 @@
+{
+  "about": "TypeScript classes: class nodes, extends, `new UsersApi()` and an inherited `this.request()`",
+  "concepts": {"expected": ["js.class", "js.inheritance", "web.fetch"]},
+  "edges": {"expected": [["UsersApi", "HttpClient", "inherits"], ["makeUsersApi", "UsersApi", "calls"], ["UsersApi.list", "HttpClient.request", "calls"]], "complete": true}
+}

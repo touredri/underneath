@@ -64,7 +64,8 @@ class Symbol:
     renders: list[str] = field(default_factory=list)
     refs: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
-    member_only: list[str] = field(default_factory=list)  # names only ever called as `other.name()`, never bare or on self/this
+    member_only: list[str] = field(default_factory=list)
+    bases: list[str] = field(default_factory=list)  # classes only: what it extends  # names only ever called as `other.name()`, never bare or on self/this
     exported: bool = False
     entry: bool = False
     label: str = ""
@@ -200,6 +201,29 @@ def _parse_js(path, src, lang):
             )
         )
 
+    def add_js_class(cname, node, outer, body, exported):
+        """The class itself: header, `extends`, fields. Methods are symbols of their own."""
+        start = outer.start_byte
+        head = src[start : body.start_byte if body is not None else node.end_byte].decode("utf8", "replace")
+        fields = [_text(m, src) for m in (body.named_children if body is not None else []) if m.type != "method_definition"]
+        source = head + "{" + ("\n  " + "\n  ".join(fields) + "\n" if fields else "") + "}"
+        bases = re.findall(r"\bextends\s+([\w$.]+)", head)
+        calls, direct = [], set()
+        for m in body.named_children if body is not None else []:
+            if m.type != "method_definition":
+                c, _, d = _js_calls(m, src)
+                calls += c
+                direct |= d
+        out.append(
+            Symbol(
+                file=path, qualname=cname, name=cname, kind="class", lang=lang,
+                start_line=outer.start_point[0] + 1, end_line=outer.end_point[0] + 1,
+                source=source, signature=_signature(head.strip() + " {"),
+                calls=calls, member_only=_member_only(calls, direct),
+                bases=[b.split(".")[-1] for b in bases], exported=exported,
+            )
+        )
+
     def visit(stmt, exported=False, outer=None):
         outer = outer or stmt
         t = stmt.type
@@ -235,6 +259,7 @@ def _parse_js(path, src, lang):
             cn = stmt.child_by_field_name("name")
             cname = _text(cn, src) if cn is not None else "Class"
             body = stmt.child_by_field_name("body")
+            add_js_class(cname, stmt, outer, body, exported)
             for m in body.named_children if body is not None else []:
                 if m.type == "method_definition":
                     mn = m.child_by_field_name("name")
@@ -320,6 +345,37 @@ def _parse_py(path, src, lang):
             )
         )
 
+    def py_class(cname, defn, outer, body):
+        """The class itself: decorators, bases, class attributes. Methods are symbols of their own."""
+        head = src[outer.start_byte : body.start_byte if body is not None else defn.end_byte].decode("utf8", "replace")
+        own = []
+        calls, direct = [], set()
+        for m in body.named_children if body is not None else []:
+            md, _ = unwrap(m)
+            if md is not None and md.type == "function_definition":
+                continue
+            own.append(_text(m, src))
+            c, d = _py_calls(m, src)
+            calls += c
+            direct |= d
+        bases = []
+        sup = defn.child_by_field_name("superclasses")
+        for a in sup.named_children if sup is not None else []:
+            if a.type in ("identifier", "attribute"):
+                name = _text(a, src).split(".")[-1]
+                if name != "object":
+                    bases.append(name)
+        source = head.rstrip() + ("\n    " + "\n    ".join(own) if own else "\n    ...")
+        out.append(
+            Symbol(
+                file=path, qualname=cname, name=cname, kind="class", lang=lang,
+                start_line=outer.start_point[0] + 1, end_line=outer.end_point[0] + 1,
+                source=source, signature=_signature(head),
+                calls=calls, member_only=_member_only(calls, direct), decorators=decorators(outer),
+                bases=bases, exported=not cname.startswith("_"),
+            )
+        )
+
     def unwrap(stmt):
         if stmt.type == "decorated_definition":
             d = stmt.child_by_field_name("definition")
@@ -336,6 +392,7 @@ def _parse_py(path, src, lang):
             cn = defn.child_by_field_name("name")
             cname = _text(cn, src) if cn is not None else "Class"
             body = defn.child_by_field_name("body")
+            py_class(cname, defn, outer, body)
             for m in body.named_children if body is not None else []:
                 md, mo = unwrap(m)
                 if md is not None and md.type == "function_definition":

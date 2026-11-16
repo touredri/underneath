@@ -178,7 +178,7 @@ def neighbour_files(scope: Scope, changed: list[Symbol], suffixes: dict[str, lis
         callers[s.name.split(".")[-1]].add(fam)
         if "." in s.qualname:
             callers[s.qualname.split(".")[0]].add(fam)  # a constructor is called by its class name
-        for n in (*s.calls, *s.renders, *s.decorators):
+        for n in (*s.calls, *s.renders, *s.decorators, *s.bases):
             callees[n].add(fam)
     names = {n for n in set(callers) | set(callees) if _IDENT.fullmatch(n) and n not in _RESERVED}
 
@@ -318,9 +318,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
     imports = {f: _imports(f, scope.universe.get(f) or scope.new.get(f, ""), files, suffixes) for f in by_file}
     by_name: dict[str, list[Symbol]] = defaultdict(list)
     for s in syms.values():
-        by_name[s.name].append(s)
-        if s.qualname.endswith((".__init__", ".constructor")):
-            by_name[s.qualname.rsplit(".", 1)[0].split(".")[-1]].append(s)
+        by_name[s.name].append(s)  # a class is found by its name: `Cart()` links to the class
         short = s.name.split(".")[-1]
         if s.lang == "sql" and short != s.name:
             by_name[short].append(s)
@@ -363,6 +361,10 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             t = resolve(s, name)
             if t is not None:
                 edges.add((s.key, t.key, "decorated by"))
+        for name in set(s.bases):
+            t = resolve(s, name)
+            if t is not None and t.kind == "class":
+                edges.add((s.key, t.key, "inherits"))
         for name in set(s.refs):
             t = resolve(s, name)
             if t is not None:
@@ -388,7 +390,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             STATUS_SCORE[status[k]]
             + min(deg, 4)
             + (2 if s.entry else 0)
-            + (1 if s.kind in ("component", "hook", "view", "table") else 0)
+            + (1 if s.kind in ("component", "hook", "view", "table", "class") else 0)
             + min(added.get(k, 0) / 10, 3)
             - (3 if is_test(s.file) else 0)
         )
