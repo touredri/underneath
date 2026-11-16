@@ -12,8 +12,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
+from bisect import bisect_left
+
 try:
-    from tree_sitter_language_pack import get_parser
+    from tree_sitter_language_pack import get_language, get_parser
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
         "underneath needs tree-sitter. Install it once in a virtualenv the script finds by itself:\n"
@@ -92,6 +94,62 @@ def _walk(node):
         stack.extend(reversed(n.children))
 
 
+# One tree-sitter query per file collects, in C, every node any extractor
+# needs; each extractor then reads the nodes inside its function's byte range
+# instead of walking the tree again in Python.
+_INDEXED = (
+    "call", "call_expression", "new_expression", "jsx_opening_element", "jsx_self_closing_element", "jsx_element",
+    "jsx_fragment", "string", "template_string", "assignment", "assignment_expression", "variable_declarator",
+    "arrow_function", "function_expression", "function", "generator_function", "object_reference",
+)
+_queries: dict = {}
+
+
+class _Index:
+    def __init__(self, tree, lang: str):
+        q = _queries.get(lang)
+        if q is None:
+            from tree_sitter import Query
+
+            language = get_language(lang)
+            kinds = [k for k in _INDEXED if language.id_for_node_kind(k, True) is not None]
+            q = _queries[lang] = Query(language, "[" + " ".join(f"({k})" for k in kinds) + "] @n")
+        from tree_sitter import QueryCursor
+
+        found = QueryCursor(q).captures(tree.root_node).get("n", [])
+        self.nodes = sorted(found, key=lambda n: (n.start_byte, -n.end_byte))  # the order of a preorder walk
+        self.starts = [n.start_byte for n in self.nodes]
+        self.root = tree.root_node
+
+    def within(self, node, kinds) -> list:
+        out, end = [], node.end_byte
+        i = bisect_left(self.starts, node.start_byte)
+        while i < len(self.nodes) and self.starts[i] < end:
+            n = self.nodes[i]
+            if n.end_byte <= end and n.type in kinds:
+                out.append(n)
+            i += 1
+        return out
+
+
+_index: _Index | None = None
+
+
+def _use_index(tree, lang: str) -> None:
+    global _index
+    try:
+        _index = _Index(tree, lang)
+    except Exception:  # noqa: BLE001 - an older tree-sitter without QueryCursor: walk instead
+        _index = None
+
+
+def _nodes(node, kinds) -> list:
+    """The nodes of these kinds inside `node`, in preorder (`node` included)."""
+    if _index is not None:
+        return _index.within(node, kinds)
+    return [n for n in _walk(node) if n.type in kinds]
+
+
 def _signature(source: str) -> str:
     """The declaration line(s), whitespace collapsed, decorators skipped."""
     lines = [l for l in source.strip().splitlines() if not l.strip().startswith("@")]
@@ -159,9 +217,7 @@ def _py_env(defn, src, outer_env: dict) -> tuple[dict, dict]:
             t = _type_name(_text(p.child_by_field_name("type"), src)) if p.child_by_field_name("type") else None
             if name is not None and t:
                 env[_text(name, src)] = t
-    for n in _walk(defn):
-        if n.type != "assignment":
-            continue
+    for n in _nodes(defn, ("assignment",)):
         left, right, ann = n.child_by_field_name("left"), n.child_by_field_name("right"), n.child_by_field_name("type")
         t = _type_name(_text(ann, src)) if ann is not None else _ctor(right, src)
         if t is None and right is not None and right.type == "identifier":
@@ -188,7 +244,7 @@ def _js_env(fn, src, outer_env: dict) -> tuple[dict, dict]:
                 env[_text(name, src)] = t
                 if any(c.type == "accessibility_modifier" for c in p.children):
                     attrs[_text(name, src)] = t  # constructor(private api: Api)
-    for n in _walk(fn):
+    for n in _nodes(fn, ("variable_declarator", "assignment_expression")):
         if n.type == "variable_declarator":
             name, ann, value = n.child_by_field_name("name"), n.child_by_field_name("type"), n.child_by_field_name("value")
             t = _type_name(_text(ann, src)) if ann is not None else _ctor(value, src)
@@ -206,9 +262,7 @@ def _typed_calls(node, src, env: dict, attrs: dict, lang: str) -> list[list[str]
     """[method, Type] for each `recv.method()` whose receiver type is known."""
     out = []
     own = "self" if lang == "python" else "this"
-    for n in _walk(node):
-        if n.type not in ("call", "call_expression"):
-            continue
+    for n in _nodes(node, ("call", "call_expression")):
         fn = n.child_by_field_name("function")
         if fn is None or fn.type not in ("attribute", "member_expression"):
             continue
@@ -252,9 +306,7 @@ def _string_value(node, src) -> str:
 
 def _embedded_sql(node, src) -> list[str]:
     out = []
-    for n in _walk(node):
-        if n.type not in ("string", "template_string"):
-            continue
+    for n in _nodes(node, ("string", "template_string")):
         text = _string_value(n, src)
         sink = False
         p = n.parent
@@ -295,7 +347,7 @@ def _member_only(calls: list[str], direct: set[str]) -> list[str]:
 
 def _js_calls(node, src):
     calls, renders, direct = [], [], set()
-    for n in _walk(node):
+    for n in _nodes(node, ("call_expression", "new_expression", "jsx_opening_element", "jsx_self_closing_element")):
         if n.type == "call_expression":
             fn = n.child_by_field_name("function")
             if fn is None:
@@ -325,7 +377,7 @@ def _js_calls(node, src):
 
 
 def _has_jsx(node) -> bool:
-    return any(n.type in ("jsx_element", "jsx_self_closing_element", "jsx_fragment") for n in _walk(node))
+    return bool(_nodes(node, ("jsx_element", "jsx_self_closing_element", "jsx_fragment")))
 
 
 def _wrapped_function(value):
@@ -355,14 +407,15 @@ def _js_fn(node):
     """The function node that holds the parameters (for `const f = memo((p) => ...)` too)."""
     if node.child_by_field_name("parameters") is not None:
         return node
-    for n in _walk(node):
-        if n.type in _JS_FUNC_VALUES and n.child_by_field_name("parameters") is not None:
+    for n in _nodes(node, tuple(_JS_FUNC_VALUES)):
+        if n.child_by_field_name("parameters") is not None:
             return n
     return node
 
 
 def _parse_js(path, src, lang):
     tree = _parser(lang).parse(src)
+    _use_index(tree, lang)
     out: list[Symbol] = []
     module_env: dict[str, str] = {}
     for stmt in tree.root_node.named_children:
@@ -490,7 +543,7 @@ _ROUTE = re.compile(r"@\w+\.(route|get|post|put|patch|delete|websocket|task|comm
 
 def _py_calls(node, src):
     calls, direct = [], set()
-    for n in _walk(node):
+    for n in _nodes(node, ("call",)):
         if n.type == "call":
             fn = n.child_by_field_name("function")
             if fn is None:
@@ -511,6 +564,7 @@ def _py_calls(node, src):
 
 def _parse_py(path, src, lang):
     tree = _parser(lang).parse(src)
+    _use_index(tree, lang)
     out: list[Symbol] = []
     module_env: dict[str, str] = {}
     for stmt in tree.root_node.named_children:
@@ -657,6 +711,7 @@ def _sql_ident(node, src):
 
 def _parse_sql(path, src, lang):
     tree = _parser(lang).parse(src)
+    _use_index(tree, lang)
     out: list[Symbol] = []
     for stmt in tree.root_node.named_children:
         if stmt.type != "statement" or not stmt.named_children:
@@ -671,7 +726,7 @@ def _parse_sql(path, src, lang):
         if body.type == "create_index":
             ident = next((c for c in body.named_children if c.type == "identifier"), None)
             name = _sql_ident(ident, src) if ident is not None else None
-        for n in _walk(body):
+        for n in _nodes(body, ("object_reference",)):
             if n.type == "object_reference":
                 refs.append(_sql_ident(n, src))
         if kind in _SQL_NAMED and kind != "index" and refs:
@@ -715,12 +770,16 @@ def parse_file(path: str, text: str) -> list[Symbol]:
     if lang is None:
         return []
     src = text.encode("utf8")
-    if lang == "python":
-        syms = _parse_py(path, src, lang)
-    elif lang == "sql":
-        syms = _parse_sql(path, src, lang)
-    else:
-        syms = _parse_js(path, src, lang)
+    global _index
+    try:
+        if lang == "python":
+            syms = _parse_py(path, src, lang)
+        elif lang == "sql":
+            syms = _parse_sql(path, src, lang)
+        else:
+            syms = _parse_js(path, src, lang)
+    finally:
+        _index = None
     seen: dict[str, int] = {}
     for s in syms:
         if not s.label:
