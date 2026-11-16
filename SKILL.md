@@ -35,7 +35,7 @@ You do not decide what is in the map. The syntax tree does. You only explain.
 4. **Write `.underneath/notes.json`** (the path is printed in the brief). Follow `references/card-format.md` exactly. In short:
    - Only ids that appear in the brief. Never add a function, a concept or a relation the brief does not contain, except up to 4 `inferred_edges` between existing ids.
    - Write about this code, not the concept in general.
-   - A concept marked `LIKELY BUG`: read the code. If the bug is real, it takes the first `watch` slot. If not, explain why in its `here`.
+   - A concept marked `LIKELY BUG`: read the code. If the bug is real, it takes the first `watch` slot ("missing …"). If it is guarded or intended (a list that never reorders, a deliberate full-table update in a migration), say why in its `here` and, if a watch slot is free, as "guarded by …". Never leave a likely bug unexplained.
    - `watch`: at most 2, only what is actually present or actually guarded in this diff. An empty list is fine.
    - `fundamental`: one id from the candidates, linked to this exact code.
 

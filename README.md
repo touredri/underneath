@@ -35,7 +35,7 @@ In a randomized controlled trial, Anthropic found that developers learning a new
 - **Built for people who won't read.** 5 lines of text. At most 7 changed functions, 3 context functions and 5 concepts on the map. Everything else is one click away.
 - **Honest about what changed.** Code moved to another file, or pulled out of a big function, is marked *moved*, not new. Editing only a docstring is no change. Tests are not drawn: they become "tested by N" on the functions they call.
 - **Links you can trust.** `cache.get(k)` links to `ReportCache.get` when the code says `cache: ReportCache`; `rows.get(k)` on a dict links to nothing. Classes, `extends` and `super()` are followed; SQL written in Python or JS strings is read as SQL.
-- **Likely bugs surface by themselves.** Some rules are marked `risk` (a mutable default argument in Python, a `WHERE` that undoes a `LEFT JOIN`). They are always drawn and the agent must check them.
+- **Likely bugs surface by themselves.** Twelve rules are marked `risk`, each tied to the fundamental that explains it: `= NULL`, `NOT IN (SELECT …)`, an `UPDATE` without `WHERE`, a `WHERE` that undoes a `LEFT JOIN`; an effect without dependencies that sets state, an async effect, `key={index}`; `forEach(async …)`, an empty `catch`; an `except` that only passes, a query in a loop (N+1), a mutable default argument. They are always drawn, the agent must say whether each one is real or guarded, and the evaluation set counts false alarms as failures.
 - **It remembers what you know.** A local registry counts the concepts you have seen. New ones get a thick border; familiar ones fade out. `/underneath gaps` lists the ones you never marked as known.
 - **Measured.** 48 diffs, half of them real commits of open-source projects, check that no concept is invented and no false link is drawn (see [Evaluation](#evaluation)).
 - **Local.** No network, no telemetry. `.underneath/` ignores itself in git.
@@ -60,7 +60,7 @@ In Claude Code:
 /plugin install underneath@underneath
 ```
 
-The plugin adds the skill and a `Stop` hook: when a turn changed code, the agent shows the card before it finishes. The hook asks once per change, never loops, and stays quiet when nothing was edited or the change is tiny. To turn it off for a project, put `{"stop_hook": false}` in `.underneath/config.json`.
+The plugin adds the skill and a `Stop` hook: when a turn changed code, the agent shows the card before it finishes. The hook asks once per change, never loops, and stays quiet when the code did not change during the turn (it follows the code, so a file rewritten through Bash counts) or the change is tiny. If `extract` takes longer than 20 seconds, it skips the card and says so. To turn it off for a project, put `{"stop_hook": false}` in `.underneath/config.json`.
 
 ### Any agent (skill only)
 
@@ -138,10 +138,10 @@ open /tmp/demo/latest.html
 `.underneath/config.json` is optional:
 
 ```json
-{ "language": "fr", "stop_hook": false, "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 } }
+{ "language": "fr", "stop_hook": false, "stop_hook_timeout": 20, "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 } }
 ```
 
-`language` sets the language of the agent's notes, `stop_hook` turns the plugin's hook off, `limits` changes the map budgets.
+`language` sets the language of the agent's notes, `stop_hook` turns the plugin's hook off, `stop_hook_timeout` is how long it waits for `extract`, `limits` changes the map budgets.
 
 ## How it works
 
@@ -203,18 +203,19 @@ Then add a case under `evals/cases/` (or an example under `examples/` with a tes
 
 Stacks we would love to see: Vue, Svelte, Next.js server components, Django ORM, FastAPI, Go, Rust, Kotlin, Flutter.
 
-## Limits (v0.3)
+## Limits (v0.4)
 
 - A method call is linked through its receiver's type only when the code states the type (annotation, constructor, attribute set from one of those). Otherwise it falls back to the name, with same-class, same-file and import hints; built-in method names (`get`, `push`, `map`…) and calls on a chain (`self.x.m()`) are then not linked at all.
 - Nested functions are folded into their parent. TypeScript interfaces and types are not nodes.
 - SQL in strings is read only when passed to a known sink or written in uppercase SQL; SQL assembled from pieces is not.
+- Likely-bug rules look at one function at a time: a query in a loop is seen when both are in the same function, not when the loop calls a helper that queries.
 - Concept rules are pattern-based. The evaluation set keeps them honest, but it is small.
 - The map is regenerated each time. There is no history yet.
 
 ## Roadmap
 
-- **v0.4**: optional reading of a [Graphify](https://github.com/Graphify-Labs/graphify) `graph.json` for callers outside the repo scan; more real commits in the evaluation set.
-- **v0.5**: more stacks (Vue, Django, Go).
+- **v0.5**: optional reading of a [Graphify](https://github.com/Graphify-Labs/graphify) `graph.json` for callers outside the repo scan; more real commits in the evaluation set.
+- **v0.6**: more stacks (Vue, Django ORM, Go).
 - **v1.0**: team mode, with a shared project registry as living onboarding documentation.
 
 ## Credits
