@@ -18,6 +18,8 @@ import os
 import sys
 from pathlib import Path
 
+__version__ = "0.2.0"
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
@@ -277,6 +279,7 @@ def cmd_known(a) -> int:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="underneath", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--version", action="version", version=f"underneath {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("extract", help="read the diff and build graph.json")
     e.add_argument("--base", default="HEAD", help="git ref to compare with (default HEAD: uncommitted work)")

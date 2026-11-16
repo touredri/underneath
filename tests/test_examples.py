@@ -334,6 +334,13 @@ def test_stop_hook_stays_quiet():
     assert _hook(outside, edited) is None  # not a git repository
 
 
+def test_version_is_consistent():
+    r = subprocess.run([sys.executable, CLI, "--version"], capture_output=True, text=True, check=True)
+    version = r.stdout.split()[-1]
+    assert json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())["version"] == version
+    assert f"## [{version}]" in (ROOT / "CHANGELOG.md").read_text()
+
+
 # ---------------------------------------------------------------- evals ---
 
 

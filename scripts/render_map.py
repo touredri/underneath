@@ -39,6 +39,11 @@ def _name(cid: str, catalogue: dict[str, Concept]) -> str:
     return f"{c.label} ({cid.split('.')[0]})" if twins else c.label
 
 
+def _n(count: int, word: str) -> str:
+    """`1 use`, `12 uses`, `1,204 uses`."""
+    return f"{count:,} {word}{'' if count == 1 else 's'}"
+
+
 def _label(fid: str, fundamentals: dict[str, Fundamental]) -> str:
     return fundamentals[fid].label if fid in fundamentals else fid.replace("-", " ").capitalize()
 
@@ -116,11 +121,11 @@ def map_page(data: dict, groups: list[dict], catalogue: dict[str, Concept], fund
         parts.append(f'<g class="ed fund" data-a="f:{e(fid)}" data-b=""><path d="M{f["x"] + f["w"]:.1f} {y:.1f} H{last["x"] + last["w"] / 2:.1f}"/></g>')
     for fid, cids, more in rows:
         g = next(x for x in groups if x["id"] == fid)
-        parts.append(_node_svg("f:" + fid, pos["f:" + fid], _label(fid, fundamentals), f"{g['count']:,} uses", "fu"))
+        parts.append(_node_svg("f:" + fid, pos["f:" + fid], _label(fid, fundamentals), _n(g['count'], 'use'), "fu"))
         fu = fundamentals.get(fid)
         items["f:" + fid] = {
             "label": _label(fid, fundamentals),
-            "loc": f"fundamental · {g['count']:,} uses in your code" + (f" · /underneath deeper {fid}" if fu else ""),
+            "loc": f"fundamental · {_n(g['count'], 'use')} in your code" + (f" · /underneath deeper {fid}" if fu else ""),
             "text": fu.one_liner if fu else "",
             "example": fu.example if fu else "",
             "users": g["concepts"],
@@ -129,10 +134,10 @@ def map_page(data: dict, groups: list[dict], catalogue: dict[str, Concept], fund
             c, info = catalogue[cid], data["concepts"][cid]
             cls, state = _state(cid, registry)
             if cid in cids:
-                parts.append(_node_svg(cid, pos[cid], _name(cid, catalogue), f"{info['count']:,} uses · {info['files']} file{'s' if info['files'] > 1 else ''}", cls, c.risk))
+                parts.append(_node_svg(cid, pos[cid], _name(cid, catalogue), f"{_n(info['count'], 'use')} · {_n(info['files'], 'file')}", cls, c.risk))
             items[cid] = {
                 "label": _name(cid, catalogue),
-                "loc": f"concept · {c.stack} · {info['count']:,} uses in {info['files']} file{'s' if info['files'] > 1 else ''} · {state}",
+                "loc": f"concept · {c.stack} · {_n(info['count'], 'use')} in {_n(info['files'], 'file')} · {state}",
                 "text": c.what,
                 "watch": [f"likely bug at {p}" for p in info["places"]],
                 "pitfalls": c.pitfalls[:2],
