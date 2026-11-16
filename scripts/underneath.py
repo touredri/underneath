@@ -3,6 +3,8 @@
 
   underneath.py extract [--base REF] [--before DIR --after DIR] [--out DIR]
   underneath.py render  [--out DIR]
+  underneath.py map     [--root DIR] [--out DIR]
+  underneath.py gaps    [--root DIR] [--out DIR]
   underneath.py deeper  ID
   underneath.py known   CONCEPT_ID
 """
@@ -41,9 +43,11 @@ def _use_skill_venv() -> None:
 _use_skill_venv()
 
 from concepts import load_concepts, load_fundamentals  # noqa: E402
-from diffscope import from_dirs, from_git  # noqa: E402
+from diffscope import from_dirs, from_git, project_scope  # noqa: E402
 from graph import LIMITS, build  # noqa: E402
+from project import by_fundamental, gaps, scan  # noqa: E402
 from render import card, clean_notes, counts, page, update_registry  # noqa: E402
+from render_map import gaps_card, map_card, map_page  # noqa: E402
 
 REF = HERE.parent / "references"
 MAX_SNIPPET = 40
@@ -192,6 +196,41 @@ def cmd_render(a) -> int:
     return 0
 
 
+def _project(a):
+    """Scan the project (cached), with the output folder and registry it uses."""
+    scope = project_scope(Path(a.root) if a.root else None)
+    out = _out_dir(a.out, scope.root)
+    catalogue = load_concepts(REF)
+    data = scan(scope, catalogue, REF, out / "cache")
+    registry = _load(out / "registry.json", {})
+    return data, catalogue, registry, out
+
+
+def _shown(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
+def cmd_map(a) -> int:
+    data, catalogue, registry, out = _project(a)
+    fundamentals = load_fundamentals(REF)
+    groups = by_fundamental(data, catalogue)
+    gap_ids = gaps(data, registry)
+    (out / "map.json").write_text(json.dumps(data, indent=1), encoding="utf8")
+    html_path = out / "map.html"
+    html_path.write_text(map_page(data, groups, catalogue, fundamentals, registry, gap_ids), encoding="utf8")
+    print(map_card(data, groups, catalogue, fundamentals, gap_ids, _shown(html_path)))
+    return 0
+
+
+def cmd_gaps(a) -> int:
+    data, catalogue, registry, _ = _project(a)
+    print(gaps_card(data, gaps(data, registry), catalogue))
+    return 0
+
+
 def cmd_deeper(a) -> int:
     fundamentals = load_fundamentals(REF)
     catalogue = load_concepts(REF)
@@ -245,13 +284,19 @@ def main(argv=None) -> int:
     e.add_argument("--out", help="output folder (default <repo>/.underneath)")
     r = sub.add_parser("render", help="build card.md and latest.html from graph.json + notes.json")
     r.add_argument("--out")
+    for name, text in (("map", "the whole project's concepts, grouped by fundamental: card + map.html"),
+                       ("gaps", "concepts in the code you never marked known, most used first")):
+        m = sub.add_parser(name, help=text)
+        m.add_argument("--root", help="project folder (default: the current git repository, or the current folder)")
+        m.add_argument("--out", help="output folder (default <project>/.underneath)")
     d = sub.add_parser("deeper", help="explain a fundamental or a concept with a minimal example")
     d.add_argument("id")
     k = sub.add_parser("known", help="mark a concept as known so it is drawn compact")
     k.add_argument("id")
     k.add_argument("--out")
     a = p.parse_args(argv)
-    return {"extract": cmd_extract, "render": cmd_render, "deeper": cmd_deeper, "known": cmd_known}[a.cmd](a)
+    cmds = {"extract": cmd_extract, "render": cmd_render, "map": cmd_map, "gaps": cmd_gaps, "deeper": cmd_deeper, "known": cmd_known}
+    return cmds[a.cmd](a)
 
 
 if __name__ == "__main__":

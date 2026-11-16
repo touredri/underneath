@@ -135,16 +135,41 @@ def from_git(cwd: Path, base: str = "HEAD") -> Scope:
         if code != "A" and has_head:
             scope.old[rel] = _git(root, "show", f"{base}:{rel}", check=False)
 
-    tracked = _git(root, "ls-files").splitlines() + list(scope.new)
-    for rel in tracked:
+    _fill_universe(scope, _git(root, "ls-files").splitlines() + list(scope.new))
+    return scope
+
+
+def _fill_universe(scope: Scope, paths: list[str], limit: int = MAX_FILES) -> None:
+    for rel in paths:
         if rel in scope.universe or _skip(rel) or rel in scope.deleted:
             continue
-        if len(scope.universe) >= MAX_FILES:
+        if len(scope.universe) >= limit:
             scope.truncated = True
             break
-        text = scope.new.get(rel) or _read(root / rel)
+        text = scope.new.get(rel) or _read(scope.root / rel)
         if text is not None:
             scope.universe[rel] = text
+
+
+def project_scope(folder: Path | None = None, limit: int = MAX_FILES) -> Scope:
+    """Every supported file of the project, no diff: what `map` and `gaps` read.
+
+    Without `folder`: the current git repository (or the current folder).
+    With `folder`: only what is under it, even inside a bigger repository.
+    In git: tracked files plus untracked ones that are not ignored. Elsewhere:
+    a walk, skipping dependency and build folders.
+    """
+    here = (folder or Path.cwd()).resolve()
+    try:
+        top = Path(_git(here, "rev-parse", "--show-toplevel").strip())
+    except (RuntimeError, OSError):
+        scope = Scope(root=here, base_label="(folder)")
+        _fill_universe(scope, sorted(_tree(here)), limit)
+        return scope
+    root = here if folder else top
+    scope = Scope(root=root, base_label="(project)", git_root=root)
+    paths = _git(root, "ls-files").splitlines() + _git(root, "ls-files", "--others", "--exclude-standard").splitlines()
+    _fill_universe(scope, paths, limit)
     return scope
 
 

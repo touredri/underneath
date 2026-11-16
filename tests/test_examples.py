@@ -195,6 +195,72 @@ def test_tests_are_not_nodes():
     assert err.strip() == "", err
 
 
+# ------------------------------------------------------------ map, gaps ---
+
+
+def _project(cmd: str, root: Path, out: Path):
+    r = subprocess.run([sys.executable, CLI, cmd, "--root", root, "--out", out], capture_output=True, text=True, check=True)
+    return r.stdout
+
+
+def _project_out() -> Path:
+    out = Path(tempfile.mkdtemp(prefix="underneath-map-"))
+    shutil.copy(EX / "project-map" / "registry.json", out / "registry.json")
+    return out
+
+
+def test_map():
+    out = _project_out()
+    card = _project("map", EX / "project-map", out)
+    lines = card.strip().splitlines()
+    assert len(lines) <= 5, card
+    assert lines[0].startswith("underneath map · 5 files · 7 functions · 12 concepts on 7 fundamentals"), lines[0]
+    assert lines[1].startswith("  top   closures 4 · event loop 4"), lines[1]
+    assert "⚠" in card and "api/app/services.py:4" in card  # risks surface on the project map too
+    assert "/underneath gaps" in card
+    data = json.loads((out / "map.json").read_text())
+    assert data["test_files"] == 1
+    assert data["concepts"]["react.useState"]["count"] == 2  # the test harness's useState is not counted
+    assert data["concepts"]["react.useState"]["top_files"] == [["web/src/Profile.jsx", 1], ["web/src/Search.jsx", 1]]
+    assert data["concepts"]["sql.leftJoinWhere"]["places"] == ["db/reports.sql:1"]
+    page = (out / "map.html").read_text()
+    assert page.count('class="nd') >= 12
+    assert 'data-id="f:closures"' in page and 'data-id="react.useEffect"' in page
+    assert 'class="nd co ctx" data-id="react.useState"' in page  # marked known: faded
+    assert "/underneath deeper react.useEffect" in page
+
+
+def test_map_cache():
+    root = Path(tempfile.mkdtemp(prefix="underneath-proj-")) / "p"
+    shutil.copytree(EX / "project-map", root)
+    out = _project_out()
+    _project("map", root, out)
+    assert json.loads((out / "map.json").read_text())["parsed"] == 5
+    _project("map", root, out)
+    assert json.loads((out / "map.json").read_text())["parsed"] == 0  # nothing changed: all from the cache
+    (root / "web" / "src" / "Counter.jsx").write_text(
+        "import { useState } from 'react';\n\nexport function Counter() {\n"
+        "  const [n, setN] = useState(0);\n  return <button onClick={() => setN(n + 1)}>{n}</button>;\n}\n"
+    )
+    _project("map", root, out)
+    data = json.loads((out / "map.json").read_text())
+    assert data["parsed"] == 1 and data["files"] == 6
+    assert data["concepts"]["react.useState"]["count"] == 3
+
+
+def test_gaps():
+    out = _project_out()
+    card = _project("gaps", EX / "project-map", out)
+    lines = card.strip().splitlines()
+    assert len(lines) <= 5, card
+    assert lines[0] == "underneath gaps · 11 of 12 concepts in your code never marked known, most used first"
+    assert "useState" not in card  # marked known in the registry
+    assert lines[1].startswith("  async / await (py)") and "3×" in lines[1]
+    assert all("/underneath deeper " in l for l in lines[1:])
+    counts_ = [int(l.split("×")[0].split()[-1]) for l in lines[1:]]
+    assert counts_ == sorted(counts_, reverse=True)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

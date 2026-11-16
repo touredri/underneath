@@ -1,6 +1,6 @@
 ---
 name: underneath
-description: After you write or change code (TypeScript/React, JavaScript, Python, SQL), show the developer a 5-line card and a visual map of the functions you generated, how they connect, the key concepts they use (hooks, async, joins…) and the language fundamental underneath. Use once at the end of a coding task that added or changed real code, or when the user says /underneath, "what did you just write", "map the changes" or "explain the concepts in this diff".
+description: After you write or change code (TypeScript/React, JavaScript, Python, SQL), show the developer a 5-line card and a visual map of the functions you generated, how they connect, the key concepts they use (hooks, async, joins…) and the language fundamental underneath. Use once at the end of a coding task that added or changed real code, or when the user says /underneath, "what did you just write", "map the changes" or "explain the concepts in this diff". Also maps the whole project's concepts (/underneath map, "what concepts does this codebase rest on") and lists the ones the user never marked known (/underneath gaps, "what should I learn in this code").
 ---
 
 # underneath
@@ -51,6 +51,8 @@ You do not decide what is in the map. The syntax tree does. You only explain.
 
 ## Other commands
 
+- `/underneath map`: the whole project's concept skeleton. Run `python3 SKILL_DIR/scripts/underneath.py map` from the project root and show the card verbatim in a code block, plus at most one sentence. It writes `.underneath/map.html`: one row per fundamental, the concepts of the code that rest on it, most used first. The first run parses every file (a few seconds on a large repository); later runs only re-read what changed. Do not write notes for it: there is nothing to explain, only to show.
+- `/underneath gaps`: run `… underneath.py gaps` and show its lines verbatim: the concepts present in the code that the user never marked known, most used first, each with its `deeper` command. If the user picks one, run `deeper` on it (below). If they say they know one, run `known` on it.
 - `/underneath deeper <id>`: run `python3 SKILL_DIR/scripts/underneath.py deeper <id>` with a fundamental id (`closures`) or a concept id (`react.useEffect`) and show the output. Then relate it to the user's code in two or three sentences.
 - `/underneath known <concept id>`: run `… underneath.py known <id>`. The concept will be drawn compact from now on.
 - "since <ref>": rerun step 2 with `--base <ref>`.
