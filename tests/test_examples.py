@@ -311,6 +311,44 @@ def test_gaps():
     assert counts_ == sorted(counts_, reverse=True)
 
 
+# -------------------------------------------------------------- history ---
+
+
+def test_history_and_log():
+    """Each card goes to history.jsonl once; `log` sums up a period in 5 lines."""
+    g, _, _, _, out = run("python-dashboard")
+    subprocess.run([sys.executable, CLI, "render", "--out", out], capture_output=True, check=True)  # same change again
+    lines = (out / "history.jsonl").read_text().splitlines()
+    assert len(lines) == 1, lines
+    first = json.loads(lines[0])
+    assert first["risks"] == ["py.mutableDefault"] and first["hub"]
+
+    from datetime import datetime, timedelta
+
+    from concepts import load_concepts
+    from history import log_card
+
+    cat = load_concepts(ROOT / "references")
+    now = datetime(2026, 11, 16, 12, 0)
+    def item(days_ago, concepts, new=(), risks=()):
+        return {"at": (now - timedelta(days=days_ago)).isoformat(), "concepts": list(concepts), "new_concepts": list(new), "risks": list(risks)}
+    items = [
+        item(30, ["react.useMemo"]),  # outside the week
+        item(5, ["react.useEffect", "react.useState", "react.keys"], new=["react.useEffect"]),
+        item(3, ["react.useEffect", "sql.leftJoinWhere", "react.keys", "react.callbackProps"], risks=["sql.leftJoinWhere"]),
+        item(1, ["react.useEffect", "js.promiseAll", "react.keys"], new=["js.promiseAll"]),
+    ]
+    card = log_card(items, cat, {"concepts": {"react.useState": {"known": True}}}, 7, now)
+    lines = card.splitlines()
+    assert len(lines) <= 5, card
+    assert lines[0] == "underneath log · 3 changes in the last 7 days · 6 concepts, 2 new", lines[0]
+    assert lines[1].startswith("  most  useEffect ×3 ·"), lines[1]  # List keys (×3, minor) comes after
+    assert "useMemo" not in card
+    assert "LEFT JOIN" in lines[3] and "Nov 13" in lines[3]
+    assert lines[4].endswith("/underneath deeper react.useEffect")
+    assert log_card([], cat, {}, 7, now) == "underneath log · no card in the last 7 days"
+
+
 # ------------------------------------------------------------ stop hook ---
 
 HOOK = ROOT / "scripts" / "stop_hook.py"

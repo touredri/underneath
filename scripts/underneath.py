@@ -5,6 +5,7 @@
   underneath.py render  [--out DIR]
   underneath.py map     [--root DIR] [--out DIR]
   underneath.py gaps    [--root DIR] [--out DIR]
+  underneath.py log     [--days N] [--root DIR] [--out DIR]
   underneath.py deeper  ID
   underneath.py known   CONCEPT_ID
 """
@@ -48,6 +49,7 @@ _use_skill_venv()
 from concepts import load_concepts, load_fundamentals  # noqa: E402
 from diffscope import from_dirs, from_git, project_scope  # noqa: E402
 from graph import LIMITS, build  # noqa: E402
+from history import append as history_append, entry as history_entry, load as history_load, log_card  # noqa: E402
 from project import by_fundamental, gaps, scan  # noqa: E402
 from render import card, clean_notes, counts, page, update_registry  # noqa: E402
 from render_map import gaps_card, map_card, map_page  # noqa: E402
@@ -191,6 +193,7 @@ def cmd_render(a) -> int:
     gid = hashlib.sha1((out / "graph.json").read_bytes()).hexdigest()[:12]
     reg = update_registry(_load(out / "registry.json", {}), graph, gid)
     (out / "registry.json").write_text(json.dumps(reg, indent=1), encoding="utf8")
+    history_append(out / "history.jsonl", history_entry(graph, notes, text))
     if not raw:
         warnings.insert(0, "no notes.json: card drawn from the syntax tree only")
     for w in warnings:
@@ -232,6 +235,22 @@ def cmd_gaps(a) -> int:
     data, catalogue, registry, _ = _project(a)
     print(gaps_card(data, gaps(data, registry, catalogue), catalogue))
     return 0
+
+
+def cmd_log(a) -> int:
+    out = Path(a.out) if a.out else _repo_out(Path(a.root) if a.root else Path.cwd())
+    catalogue = load_concepts(REF)
+    print(log_card(history_load(out / "history.jsonl"), catalogue, _load(out / "registry.json", {}), a.days))
+    return 0
+
+
+def _repo_out(here: Path) -> Path:
+    try:
+        from diffscope import _git
+
+        return Path(_git(here, "rev-parse", "--show-toplevel").strip()) / ".underneath"
+    except (RuntimeError, OSError):
+        return here / ".underneath"
 
 
 def cmd_deeper(a) -> int:
@@ -293,13 +312,17 @@ def main(argv=None) -> int:
         m = sub.add_parser(name, help=text)
         m.add_argument("--root", help="project folder (default: the current git repository, or the current folder)")
         m.add_argument("--out", help="output folder (default <project>/.underneath)")
+    lg = sub.add_parser("log", help="what the last cards showed: concepts that came back, new ones, likely bugs")
+    lg.add_argument("--days", type=int, default=7, help="period, in days (default 7)")
+    lg.add_argument("--root", help="project folder (default: the current git repository)")
+    lg.add_argument("--out", help="output folder (default <project>/.underneath)")
     d = sub.add_parser("deeper", help="explain a fundamental or a concept with a minimal example")
     d.add_argument("id")
     k = sub.add_parser("known", help="mark a concept as known so it is drawn compact")
     k.add_argument("id")
     k.add_argument("--out")
     a = p.parse_args(argv)
-    cmds = {"extract": cmd_extract, "render": cmd_render, "map": cmd_map, "gaps": cmd_gaps, "deeper": cmd_deeper, "known": cmd_known}
+    cmds = {"extract": cmd_extract, "render": cmd_render, "map": cmd_map, "gaps": cmd_gaps, "log": cmd_log, "deeper": cmd_deeper, "known": cmd_known}
     return cmds[a.cmd](a)
 
 
