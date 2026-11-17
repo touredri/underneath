@@ -151,7 +151,9 @@ def cmd_extract(a) -> int:
         flag = "new to you" if c["new_to_you"] else f"seen {c['seen']}x"
         if c.get("risk"):
             flag = "LIKELY BUG, check and add a watch item · " + flag
-        lines.append(f"{c['id']}  {c['label']} · {flag} · in {', '.join(c['users'])} · fundamental: {c['fundamental']}")
+        through = [f"{n['id']} through {n['via'][c['id']]}" for n in g["nodes"] if c["id"] in n.get("via", {})]
+        where = ", ".join(c["users"]) + (f" ({'; '.join(through)}: one call away, read that function too)" if through else "")
+        lines.append(f"{c['id']}  {c['label']} · {flag} · in {where} · fundamental: {c['fundamental']}")
         lines.append(f"    pitfalls: {' '.join(c['pitfalls'])}")
     if s["more_concepts"]:
         lines.append(f"(also present, not drawn: {', '.join(s['more_concepts'])})")

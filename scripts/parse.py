@@ -73,7 +73,10 @@ class Symbol:
     bases: list[str] = field(default_factory=list)  # classes only: what it extends
     typed_calls: list[list[str]] = field(default_factory=list)  # [method, Type] when the receiver's type is known
     embedded_sql: list[str] = field(default_factory=list)  # SQL written in this function's strings
-    flags: list[str] = field(default_factory=list)  # structural patterns for `detect: tree <flag>` rules  # names only ever called as `other.name()`, never bare or on self/this
+    flags: list[str] = field(default_factory=list)  # structural patterns for `detect: tree <flag>` rules
+    loop_calls: list[str] = field(default_factory=list)  # functions called inside a loop body (bare, self., module.)
+    foreach_refs: list[str] = field(default_factory=list)  # functions passed by name to .forEach(fn)
+    via: dict = field(default_factory=dict)  # flag -> the function, one call away, that makes it true
     exported: bool = False
     entry: bool = False
     label: str = ""
@@ -368,8 +371,28 @@ def _is_async_fn(node, src) -> bool:
     return node is not None and node.type in _JS_FUNC_VALUES and _text(node, src).lstrip().startswith("async")
 
 
-def _js_flags(node, src) -> list[str]:
-    flags = set()
+def _local_setters(node, src) -> set[str]:
+    """Functions declared inside this component whose body calls a state setter (`setX(...)`)."""
+    out = set()
+    for d in _nodes(node, ("variable_declarator", "function_declaration")):
+        if d is node:
+            continue
+        name = d.child_by_field_name("name")
+        body = d.child_by_field_name("value") if d.type == "variable_declarator" else d
+        if name is None or body is None or (d.type == "variable_declarator" and body.type not in _JS_FUNC_VALUES):
+            continue
+        if any(
+            re.fullmatch(r"set[A-Z]\w*", _text(c.child_by_field_name("function"), src) or "")
+            for c in _nodes(body, ("call_expression",))
+            if c.child_by_field_name("function") is not None and c.child_by_field_name("function").type == "identifier"
+        ):
+            out.add(_text(name, src))
+    return out
+
+
+def _js_flags(node, src) -> tuple[list[str], list[str], dict]:
+    """(flags, functions passed to forEach by name, flag -> local function that makes it true)."""
+    flags, refs, via = set(), [], {}
     for n in _nodes(node, ("call_expression", "jsx_attribute", "catch_clause")):
         if n.type == "call_expression":
             fn = n.child_by_field_name("function")
@@ -379,14 +402,24 @@ def _js_flags(node, src) -> list[str]:
             if name in _EFFECTS and first is not None and first.type in _JS_FUNC_VALUES:
                 if _is_async_fn(first, src):
                     flags.add("async-effect")
-                if len(args.named_children) == 1 and any(
-                    re.fullmatch(r"set[A-Z]\w*", _text(c.child_by_field_name("function"), src) or "")
+                called = [
+                    _text(c.child_by_field_name("function"), src)
                     for c in _nodes(first, ("call_expression",))
                     if c.child_by_field_name("function") is not None and c.child_by_field_name("function").type == "identifier"
-                ):
-                    flags.add("effect-no-deps-sets-state")
-            elif name == "forEach" and fn is not None and fn.type == "member_expression" and _is_async_fn(first, src):
-                flags.add("foreach-async")
+                ]
+                if len(args.named_children) == 1:
+                    if any(re.fullmatch(r"set[A-Z]\w*", c) for c in called):
+                        flags.add("effect-no-deps-sets-state")
+                    else:  # through one call: a function of the same component that sets state
+                        setter = next((c for c in called if c in _local_setters(node, src)), None)
+                        if setter:
+                            flags.add("effect-no-deps-sets-state")
+                            via["effect-no-deps-sets-state"] = setter
+            elif name == "forEach" and fn is not None and fn.type == "member_expression":
+                if _is_async_fn(first, src):
+                    flags.add("foreach-async")
+                elif first is not None and first.type in ("identifier", "member_expression"):
+                    refs.append(_text(first, src).split(".")[-1])
         elif n.type == "jsx_attribute":
             parts = n.named_children
             if len(parts) == 2 and _text(parts[0], src) == "key" and parts[1].type == "jsx_expression":
@@ -397,7 +430,10 @@ def _js_flags(node, src) -> list[str]:
             body = n.child_by_field_name("body")
             if body is not None and not body.named_children:  # a comment inside says it is deliberate
                 flags.add("empty-catch")
-    return sorted(flags)
+    head = re.sub(r"^\s*(export\s+(default\s+)?)?", "", _text(node, src))
+    if _is_async_fn(_js_fn(node), src) or head.startswith(("async ", "async(")) or re.match(r"[\w$]+\s*=\s*async\b", head):
+        flags.add("async-fn")  # async function f, async m() {}, const f = async () => ...
+    return sorted(flags), sorted(set(refs)), via
 
 
 def _is_map_index(node, name: str, src) -> bool:
@@ -415,8 +451,13 @@ def _is_map_index(node, name: str, src) -> bool:
     return len(names) >= 2 and names[1] == name and fn is not None and _text(fn, src).endswith(".map")
 
 
-def _py_flags(node, src) -> list[str]:
-    flags = set()
+def _py_flags(node, src) -> tuple[list[str], list[str]]:
+    """(flags, functions called inside a loop body)."""
+    flags, loop_calls = set(), set()
+    if any(_DB_CALL.search(_text(c.child_by_field_name("function"), src)) for c in _nodes(node, ("call",)) if c.child_by_field_name("function") is not None):
+        flags.add("db-query")
+    if _text(node, src).lstrip().startswith("async def"):
+        flags.add("async-fn")
     for n in _nodes(node, ("except_clause", "for_statement", "while_statement")):
         if n.type == "except_clause":
             block = next((c for c in n.named_children if c.type == "block"), None)
@@ -428,13 +469,17 @@ def _py_flags(node, src) -> list[str]:
                 flags.add("swallowed-exception")
         else:
             body = n.child_by_field_name("body")
-            if body is not None and any(
-                _DB_CALL.search(_text(c.child_by_field_name("function"), src))
-                for c in _nodes(body, ("call",))
-                if c.child_by_field_name("function") is not None
-            ):
-                flags.add("query-in-loop")
-    return sorted(flags)
+            for c in _nodes(body, ("call",)) if body is not None else []:
+                fn = c.child_by_field_name("function")
+                if fn is None:
+                    continue
+                if _DB_CALL.search(_text(fn, src)):
+                    flags.add("query-in-loop")
+                elif fn.type == "identifier":
+                    loop_calls.add(_text(fn, src))
+                elif fn.type == "attribute" and fn.child_by_field_name("object") is not None and fn.child_by_field_name("object").type == "identifier":
+                    loop_calls.add(_text(fn.child_by_field_name("attribute"), src))  # self.load(), service.load()
+    return sorted(flags), sorted(loop_calls)
 
 
 # ---------------------------------------------------------------- JS / TS ---
@@ -585,6 +630,7 @@ def _parse_js(path, src, lang):
         calls, renders, direct = _js_calls(node, src)
         env, attrs = _js_env(_js_fn(node), src, module_env)
         kinds = _call_kinds(node, src, _locals(_js_fn(node), src))
+        jsf = _js_flags(node, src)
         sql = _embedded_sql(node, src)
         if kind == "method":
             attrs = {**class_attrs.get(qual.split(".")[0], {}), **attrs, "__self__": qual.split(".")[0]}
@@ -608,7 +654,9 @@ def _parse_js(path, src, lang):
                 typed_calls=_typed_calls(node, src, env, attrs, "js"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
-                flags=_js_flags(node, src),
+                flags=jsf[0],
+                foreach_refs=jsf[1],
+                via=jsf[2],
                 exported=exported,
                 entry=exported and k == "component",
             )
@@ -758,6 +806,7 @@ def _parse_py(path, src, lang):
         calls, direct = _py_calls(defn, src)
         env, attrs = _py_env(defn, src, module_env)
         kinds = _call_kinds(defn, src, _locals(defn, src))
+        pyf = _py_flags(defn, src)
         sql = _embedded_sql(defn, src)
         if cls:
             attrs = {**class_attrs.get(cls, {}), **attrs, "__self__": cls}
@@ -779,7 +828,8 @@ def _parse_py(path, src, lang):
                 typed_calls=_typed_calls(defn, src, env, attrs, "python"),
                 embedded_sql=sql,
                 refs=_sql_refs(sql),
-                flags=_py_flags(defn, src),
+                flags=pyf[0],
+                loop_calls=pyf[1],
                 decorators=decorators(outer),
                 exported=not name.startswith("_") or (name.startswith("__") and name.endswith("__")),
                 entry=bool(_ROUTE.search(source)) or name == "main",

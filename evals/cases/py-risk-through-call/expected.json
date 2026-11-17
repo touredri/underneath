@@ -1,0 +1,5 @@
+{
+  "about": "N+1 one call away: a loop calls load_orders, which queries; a loop calling format_total (no query) is fine",
+  "concepts": {"expected": ["py.queryInLoop"], "allowed": []},
+  "edges": {"expected": [["orders_report", "load_orders", "calls"], ["totals_report", "format_total", "calls"]], "complete": true}
+}

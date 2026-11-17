@@ -430,6 +430,25 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
                 label = {"index": "indexes", "table": "references"}.get(s.kind, "reads")
                 edges.add((s.key, t.key, label))
 
+    # Likely bugs one call away, through extracted edges only: a loop calling a
+    # helper that queries is N+1; forEach(save) with an async save does not wait.
+    by_key_calls: dict[str, dict[str, str]] = defaultdict(dict)  # caller -> callee name -> callee key
+    for a, b, typ in edges:
+        if typ == "calls":
+            by_key_calls[a][syms[b].name] = b
+    for k in status:
+        s = syms[k]
+        for name in s.loop_calls:
+            t = by_key_calls[k].get(name)
+            if t and "db-query" in syms[t].flags and "query-in-loop" not in s.flags:
+                s.flags = sorted({*s.flags, "query-in-loop"})
+                s.via["query-in-loop"] = syms[t].label
+        for name in s.foreach_refs:
+            t = by_key_calls[k].get(name) or (lambda c: c.key if c else None)(resolve(s, name))
+            if t and "async-fn" in syms[t].flags and "foreach-async" not in s.flags:
+                s.flags = sorted({*s.flags, "foreach-async"})
+                s.via["foreach-async"] = syms[t].label
+
     out_e: dict[str, set[str]] = defaultdict(set)
     in_e: dict[str, set[str]] = defaultdict(set)
     for a, b, _ in edges:
@@ -560,6 +579,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
                 "entry": s.entry,
                 "hub": k == hub,
                 "concepts": [c for c in uses.get(k, []) if c in shown_concepts],
+                "via": {cid: s.via[t] for cid in uses.get(k, []) for t in catalogue[cid].trees if t in s.via},
                 "tested_by": sorted(set(tested_by.get(k, []))),
                 "test": is_test(s.file),
                 "source": s.source if k in status else "",

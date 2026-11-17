@@ -1,0 +1,5 @@
+{
+  "about": "One call away: forEach(saveItem) with an async saveItem, an effect without deps calling recount() which sets state; forEach(logItem) and an effect calling report() are fine",
+  "concepts": {"expected": ["js.forEachAsync", "react.effectNoDeps", "react.useEffect", "react.useState", "web.fetch", "js.asyncAwait"], "allowed": []},
+  "edges": {"expected": [], "complete": true}
+}
