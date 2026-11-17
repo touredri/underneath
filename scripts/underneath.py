@@ -49,6 +49,7 @@ _use_skill_venv()
 from concepts import load_concepts, load_fundamentals  # noqa: E402
 from diffscope import from_dirs, from_git, project_scope  # noqa: E402
 from graph import LIMITS, build  # noqa: E402
+from graphify_link import load as graphify_load  # noqa: E402
 from history import append as history_append, entry as history_entry, load as history_load, log_card  # noqa: E402
 from project import by_fundamental, gaps, scan  # noqa: E402
 from render import card, clean_notes, counts, page, update_registry  # noqa: E402
@@ -94,7 +95,7 @@ def cmd_extract(a) -> int:
     config = _load(out / "config.json", {})
     registry = _load(out / "registry.json", {})
     catalogue = load_concepts(REF)
-    g = build(scope, catalogue, registry, config.get("limits"), out / "cache")
+    g = build(scope, catalogue, registry, config.get("limits"), out / "cache", graphify_load(scope.root, config))
     (out / "graph.json").write_text(json.dumps(g, indent=1), encoding="utf8")
     (out / "notes.json").unlink(missing_ok=True)
 
@@ -121,6 +122,7 @@ def cmd_extract(a) -> int:
     passive = {"calls": "called by", "renders": "rendered by", "reads": "read by", "references": "referenced by", "indexes": "indexed by", "decorated by": "decorates", "inherits": "inherited by", "queries": "queried by"}
     for n in g["nodes"]:
         tag = f"{n['kind'].replace('_', ' ')} · {n['status']}" + (f" from {n['moved_from']}" if n.get("moved_from") else "") + (" · hub" if n["hub"] else "")
+        tag += f" · via graphify-out, {n['graphify']}" if n.get("graphify") == "another repository" else (" · via graphify-out" if n.get("graphify") else "")
         lines.append(f"{n['id']:<4}{n['label']}  [{tag}]  {n['file']}:{n['line']}-{n['end_line']}")
         if n["concepts"]:
             lines.append(f"    concepts: {', '.join(n['concepts'])}")

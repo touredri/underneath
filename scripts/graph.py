@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from concepts import Concept, detect
 from diffscope import Scope
-from parse import Symbol, parse_file
+from parse import Symbol, language_for, parse_file
 
 LIMITS = {"changed": 7, "context": 3, "concepts": 5, "min_lines": 8}
 
@@ -307,7 +307,10 @@ class SymbolCache:
             pass
 
 
-def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: dict | None = None, cache_dir: Path | None = None) -> dict:
+def build(
+    scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: dict | None = None,
+    cache_dir: Path | None = None, graphify=None,
+) -> dict:
     lim = {**LIMITS, **(limits or {})}
     cache = SymbolCache(cache_dir)
 
@@ -503,6 +506,30 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
                 s.flags = sorted({*s.flags, "foreach-async"})
                 s.via["foreach-async"] = syms[t].label
 
+    # Callers only a Graphify graph knows (another repository of the workspace,
+    # a file outside the scan): context candidates like any other caller.
+    from_graphify: dict[str, dict] = {}
+    graphify_edges: set[tuple[str, str, str]] = set()
+    if graphify is not None:
+        known = {(s.file, s.name) for s in syms.values()}
+        for k in status:
+            s = syms[k]
+            if is_test(s.file):
+                continue
+            for c in graphify.callers_of(s.file, s.name, s.start_line):
+                if (c["file"], c["name"]) in known or is_test(c["file"]):
+                    continue
+                key = f"graphify:{c['file']}::{c['name']}"
+                if key not in syms:
+                    syms[key] = Symbol(
+                        file=c["file"], qualname=c["name"], name=c["name"], kind="function",
+                        lang=language_for(c["file"]) or "", start_line=c["line"], end_line=c["line"],
+                        source="", signature=f"{c['name']}(…)", label=c["name"],
+                    )
+                    from_graphify[key] = c
+                edges.add((key, k, "calls"))
+                graphify_edges.add((key, k, "calls"))
+
     out_e: dict[str, set[str]] = defaultdict(set)
     in_e: dict[str, set[str]] = defaultdict(set)
     for a, b, _ in edges:
@@ -627,6 +654,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
                 "line": s.start_line,
                 "end_line": s.end_line,
                 "status": status.get(k, "context"),
+                "graphify": ("another repository" if from_graphify[k]["outside"] else "graphify") if k in from_graphify else "",
                 "moved_from": moved_from.get(k, ""),
                 "signature": s.signature,
                 "added_lines": added.get(k, 0),
@@ -640,7 +668,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             }
         )
     vis_edges = [
-        {"from": ids[a], "to": ids[b], "type": t, "provenance": "extracted"}
+        {"from": ids[a], "to": ids[b], "type": t, "provenance": "graphify" if (a, b, t) in graphify_edges else "extracted"}
         for a, b, t in sorted(edges)
         if a in ids and b in ids and a != b
     ]

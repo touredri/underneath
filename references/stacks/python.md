@@ -58,7 +58,7 @@ Same format as `react.md`. Rules run on each function's source, decorators inclu
 
 ## Comprehensions
 - id: py.comprehension
-- detect: regex [\[\{(][^\[\]{}\n:]*?\bfor\s+[\w, ()]+?\s+in\s
+- detect: tree comprehension
 - fundamental: iterators
 - what: Builds a list, dict, set or generator from an iterable in one expression.
 - pitfalls: Nesting them until they are unreadable; using a list comprehension only for its side effects.

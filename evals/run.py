@@ -39,6 +39,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from concepts import load_concepts  # noqa: E402
 from diffscope import from_dirs  # noqa: E402
 from graph import build  # noqa: E402
+from graphify_link import load as graphify_load  # noqa: E402
 
 CASES = Path(__file__).resolve().parent / "cases"
 THRESHOLDS = Path(__file__).resolve().parent / "thresholds.json"
@@ -51,7 +52,8 @@ def _folders(case: Path, spec: dict) -> tuple[Path, Path]:
 
 def _graph(case: Path, spec: dict, catalogue) -> dict:
     before, after = _folders(case, spec)
-    return build(from_dirs(before, after), catalogue, {}, spec.get("limits"))
+    scope = from_dirs(before, after)
+    return build(scope, catalogue, {}, spec.get("limits"), graphify=graphify_load(scope.root, {}))
 
 
 def evaluate(case: Path, catalogue) -> dict:

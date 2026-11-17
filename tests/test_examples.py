@@ -166,6 +166,21 @@ def test_extract_cache():
     assert json.loads(cache.read_text())["files"]
 
 
+def test_graphify_callers():
+    """A graph.json in a parent folder adds callers from other repositories; "graphify": false turns it off."""
+    from graphify_link import find, load
+
+    case = ROOT / "evals" / "cases" / "graphify-workspace"
+    path, prefix = find(case / "after")
+    assert path == case / "graphify-out" / "graph.json" and prefix == "after/"
+    g = load(case / "after", {})
+    callers = {c["name"]: c for c in g.callers_of("app/pricing.py", "price_with_tax", 9)}
+    assert set(callers) == {"cart_total", "build_invoice", "test_invoice_total"}  # INFERRED send_receipt left out
+    assert callers["build_invoice"]["outside"] and not callers["cart_total"]["outside"]
+    assert load(case / "after", {"graphify": False}) is None
+    assert find(EX / "react-search" / "after") is None
+
+
 def test_same_diff_same_map():
     """Fix 1 (determinism): context and links never depend on Python's hash order."""
     outs = []

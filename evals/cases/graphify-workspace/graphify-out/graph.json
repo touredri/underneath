@@ -1,0 +1,16 @@
+{
+  "directed": true, "multigraph": false, "graph": {}, "built_at_commit": "0000000000000000000000000000000000000000",
+  "nodes": [
+    {"id": "p1", "label": "price_with_tax()", "file_type": "code", "source_file": "after/app/pricing.py", "source_location": "L9"},
+    {"id": "c1", "label": "cart_total()", "file_type": "code", "source_file": "after/app/cart.py", "source_location": "L4"},
+    {"id": "b1", "label": "build_invoice()", "file_type": "code", "source_file": "billing-service/invoices.py", "source_location": "L12"},
+    {"id": "m1", "label": ".send_receipt()", "file_type": "code", "source_file": "notifications/mailer.py", "source_location": "L30"},
+    {"id": "t1", "label": "test_invoice_total()", "file_type": "code", "source_file": "billing-service/tests/test_invoices.py", "source_location": "L5"}
+  ],
+  "links": [
+    {"relation": "calls", "confidence": "EXTRACTED", "source": "c1", "target": "p1", "source_file": "after/app/cart.py", "source_location": "L5"},
+    {"relation": "calls", "confidence": "EXTRACTED", "source": "b1", "target": "p1", "source_file": "billing-service/invoices.py", "source_location": "L14"},
+    {"relation": "calls", "confidence": "INFERRED", "source": "m1", "target": "p1", "source_file": "notifications/mailer.py", "source_location": "L31"},
+    {"relation": "calls", "confidence": "EXTRACTED", "source": "t1", "target": "p1", "source_file": "billing-service/tests/test_invoices.py", "source_location": "L6"}
+  ]
+}

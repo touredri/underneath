@@ -1,0 +1,10 @@
+{
+  "about": "A graph.json built at the workspace root adds a caller from another repository; its INFERRED edges, its tests and callers already found are not added",
+  "concepts": {"expected": ["py.exceptions", "py.comprehension"], "allowed": []},
+  "edges": {
+    "expected": [["build_invoice", "price_with_tax", "calls"], ["cart_total", "price_with_tax", "calls"]],
+    "forbidden": [["send_receipt", "price_with_tax", "calls"], ["test_invoice_total", "price_with_tax", "calls"]],
+    "complete": true
+  },
+  "context": {"forbidden": ["send_receipt", "test_invoice_total"]}
+}

@@ -109,6 +109,7 @@ _INDEXED = (
     "jsx_fragment", "string", "template_string", "assignment", "assignment_expression", "variable_declarator",
     "arrow_function", "function_expression", "function", "generator_function", "object_reference",
     "jsx_attribute", "catch_clause", "except_clause", "for_statement", "for_in_statement", "while_statement",
+    "list_comprehension", "set_comprehension", "dictionary_comprehension", "generator_expression",
 )
 _queries: dict = {}
 
@@ -458,6 +459,8 @@ def _py_flags(node, src) -> tuple[list[str], list[str]]:
         flags.add("db-query")
     if _text(node, src).lstrip().startswith("async def"):
         flags.add("async-fn")
+    if _nodes(node, ("list_comprehension", "set_comprehension", "dictionary_comprehension", "generator_expression")):
+        flags.add("comprehension")
     for n in _nodes(node, ("except_clause", "for_statement", "while_statement")):
         if n.type == "except_clause":
             block = next((c for c in n.named_children if c.type == "block"), None)

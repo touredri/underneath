@@ -263,6 +263,8 @@ def svg(graph: dict, notes: dict, lay: dict) -> str:
     for n in graph["nodes"]:
         sub = n["kind"].replace("_", " ")
         sub = f"hub · {n['status']}" if n["hub"] else f"{sub} · {n['status']}"
+        if n.get("graphify"):
+            sub = "other repo · graphify" if n["graphify"] == "another repository" else "context · graphify"
         cls = {"new": "fn-new", "modified": "fn-mod", "moved": "fn-mov", "context": "fn-ctx ctx"}[n["status"]]
         if n["hub"]:
             cls += " hub"
@@ -430,8 +432,9 @@ def build_items(graph: dict, notes: dict, fundamentals: dict[str, Fundamental]) 
             "label": n["label"],
             "loc": f"{n['file']}:{n['line']} · {n['kind'].replace('_', ' ')} · {n['status']}"
             + (f" from {n['moved_from']}" if n.get("moved_from") else "")
-            + (" · hub" if n["hub"] else ""),
-            "href": f"vscode://file/{root}/{n['file']}:{n['line']}",
+            + (" · hub" if n["hub"] else "")
+            + (f" · from graphify-out ({n['graphify']})" if n.get("graphify") else ""),
+            "href": "" if n.get("graphify") == "another repository" else f"vscode://file/{root}/{n['file']}:{n['line']}",
             "text": summary or n["signature"],
             "watch": watch.get(n["id"], []),
             "calls": calls[n["id"]],
