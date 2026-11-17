@@ -378,6 +378,16 @@ def test_history_and_log():
     assert lines[4].endswith("/underneath deeper react.useEffect")
     assert log_card([], cat, {}, 7, now) == "underneath log · no card in the last 7 days"
 
+    # Trends: new concepts against the period before, and what was marked known in this one.
+    earlier = [item(10, ["react.useMemo"], new=["react.useMemo"]), item(9, ["react.useRef"], new=["react.useRef", "react.memo"])]
+    registry = {"concepts": {"react.useState": {"known": True, "known_at": "2026-11-12"}, "react.useMemo": {"known": True, "known_at": "2026-11-01"}}}
+    card = log_card(earlier + items, cat, registry, 7, now)
+    lines = card.splitlines()
+    assert len(lines) <= 5, card
+    assert lines[0].endswith("6 concepts, 2 new (3 the 7 days before)"), lines[0]
+    assert any(l.startswith("  known useState (Nov 12)") for l in lines), card  # useMemo was known before the week
+    assert "useMemo" not in card
+
 
 # ------------------------------------------------------------ stop hook ---
 

@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 __version__ = "0.4.0"
@@ -294,7 +295,9 @@ def cmd_known(a) -> int:
         out = Path.cwd() / ".underneath"
     out = _out_dir(a.out, out.parent) if a.out else _out_dir(None, out.parent)
     reg = _load(out / "registry.json", {})
-    reg.setdefault("concepts", {}).setdefault(a.id, {"seen": 0})["known"] = True
+    entry = reg.setdefault("concepts", {}).setdefault(a.id, {"seen": 0})
+    entry["known"] = True
+    entry.setdefault("known_at", date.today().isoformat())
     (out / "registry.json").write_text(json.dumps(reg, indent=1), encoding="utf8")
     print(f"underneath: {catalogue[a.id].label} marked as known. It will be drawn compact from now on.")
     return 0
