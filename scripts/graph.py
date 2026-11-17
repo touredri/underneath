@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import difflib
+import hashlib
+import json
 import keyword
 import re
 from collections import Counter, defaultdict
-from pathlib import PurePosixPath
+from dataclasses import asdict
+from pathlib import Path, PurePosixPath
 
 from concepts import Concept, detect
 from diffscope import Scope
@@ -254,8 +257,59 @@ def neighbour_files(scope: Scope, changed: list[Symbol], suffixes: dict[str, lis
 # ----------------------------------------------------------------- graph ---
 
 
-def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: dict | None = None) -> dict:
+class SymbolCache:
+    """Parsed symbols by file content, in `.underneath/cache/symbols.json`.
+
+    JSON, not pickle: a repository could ship a crafted cache file, and
+    loading a pickle runs code. Keyed by path, content and parser version;
+    the least recently used entries go first.
+    """
+
+    KEEP = 4000
+
+    def __init__(self, folder: Path | None):
+        self.path = folder / "symbols.json" if folder else None
+        self.version = hashlib.sha1((Path(__file__).parent / "parse.py").read_bytes()).hexdigest()[:12]
+        self.entries: dict[str, dict] = {}
+        self.dirty = False
+        if self.path and self.path.exists():
+            try:
+                data = json.loads(self.path.read_text(encoding="utf8"))
+                if data.get("version") == self.version:
+                    self.entries = data.get("files", {})
+            except (OSError, ValueError):
+                self.entries = {}
+        self.clock = max((e.get("used", 0) for e in self.entries.values()), default=0)
+
+    def parse(self, rel: str, text: str) -> list[Symbol]:
+        if self.path is None:
+            return parse_file(rel, text)
+        key = rel + "\0" + hashlib.sha1(text.encode("utf8", "replace")).hexdigest()
+        self.clock += 1
+        hit = self.entries.get(key)
+        if hit is not None:
+            hit["used"] = self.clock
+            self.dirty = True
+            return [Symbol(**d) for d in hit["syms"]]
+        syms = parse_file(rel, text)
+        self.entries[key] = {"used": self.clock, "syms": [asdict(s) for s in syms]}
+        self.dirty = True
+        return syms
+
+    def save(self) -> None:
+        if not (self.path and self.dirty):
+            return
+        keep = sorted(self.entries.items(), key=lambda kv: -kv[1].get("used", 0))[: self.KEEP]
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({"version": self.version, "files": dict(keep)}, separators=(",", ":")), encoding="utf8")
+        except OSError:
+            pass
+
+
+def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: dict | None = None, cache_dir: Path | None = None) -> dict:
     lim = {**LIMITS, **(limits or {})}
+    cache = SymbolCache(cache_dir)
 
     # 1. Parse the changed files (both versions), then only the files that can
     #    connect to them. The rest of the universe is never parsed.
@@ -263,7 +317,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
     by_file: dict[str, list[Symbol]] = defaultdict(list)
 
     def take(rel: str, text: str) -> None:
-        for s in parse_file(rel, text):
+        for s in cache.parse(rel, text):
             syms[s.key] = s
             by_file[rel].append(s)
 
@@ -271,7 +325,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
         take(rel, text)
     old_syms: dict[str, Symbol] = {}
     for rel, text in scope.old.items():
-        for s in parse_file(rel, text):
+        for s in cache.parse(rel, text):
             old_syms[s.key] = s
 
     # 2. Status of each symbol in a changed file.
@@ -613,6 +667,7 @@ def build(scope: Scope, catalogue: dict[str, Concept], registry: dict, limits: d
             }
         )
 
+    cache.save()
     return {
         "schema": 1,
         "root": str(scope.root),

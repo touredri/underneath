@@ -151,6 +151,21 @@ def test_only_neighbours_are_parsed():
     assert len(card.strip().splitlines()) <= 5
 
 
+def test_extract_cache():
+    """Parsed symbols are cached by content: same graph from the cache, a broken cache is ignored."""
+    repo = _git_repo("react-search")
+    def extract():
+        subprocess.run([sys.executable, CLI, "extract"], cwd=repo, capture_output=True, check=True)
+        return json.loads((repo / ".underneath" / "graph.json").read_text())
+    first = extract()
+    cache = repo / ".underneath" / "cache" / "symbols.json"
+    assert cache.exists() and json.loads(cache.read_text())["files"]
+    assert extract() == first  # from the cache
+    cache.write_text("not json {")
+    assert extract() == first  # rebuilt
+    assert json.loads(cache.read_text())["files"]
+
+
 def test_same_diff_same_map():
     """Fix 1 (determinism): context and links never depend on Python's hash order."""
     outs = []

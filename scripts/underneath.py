@@ -94,7 +94,7 @@ def cmd_extract(a) -> int:
     config = _load(out / "config.json", {})
     registry = _load(out / "registry.json", {})
     catalogue = load_concepts(REF)
-    g = build(scope, catalogue, registry, config.get("limits"))
+    g = build(scope, catalogue, registry, config.get("limits"), out / "cache")
     (out / "graph.json").write_text(json.dumps(g, indent=1), encoding="utf8")
     (out / "notes.json").unlink(missing_ok=True)
 
