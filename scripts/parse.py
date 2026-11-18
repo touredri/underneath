@@ -365,7 +365,11 @@ def _sql_refs(texts: list[str]) -> list[str]:
 _EFFECTS = {"useEffect", "useLayoutEffect"}
 _DB_CALL = re.compile(
     r"\b(session|db|conn|connection|cursor|cur|objects)\s*\.\s*(query|execute|exec|scalars?|get|filter|first|one|all|count|fetch\w*|select|create|update|delete)\b"
+    r"|\bSessionStore\s*\("  # Django sessions live in the database by default
 )
+# Iterating a query result: each item is a model instance, so writing to it queries.
+_QUERYSET = re.compile(r"\bobjects\b|\.(iterator|all|filter|exclude|select_related|prefetch_related|order_by)\s*\(")
+_ITEM_WRITE = r"^{v}\.(save|delete|refresh_from_db)$|^{v}\.\w+\.(add|remove|set|clear|create|get_or_create|update_or_create)$"
 
 
 def _is_async_fn(node, src) -> bool:
@@ -472,11 +476,16 @@ def _py_flags(node, src) -> tuple[list[str], list[str]]:
                 flags.add("swallowed-exception")
         else:
             body = n.child_by_field_name("body")
+            item = None
+            if n.type == "for_statement":
+                left, right = n.child_by_field_name("left"), n.child_by_field_name("right")
+                if left is not None and left.type == "identifier" and right is not None and _QUERYSET.search(_text(right, src)):
+                    item = re.compile(_ITEM_WRITE.format(v=re.escape(_text(left, src))))
             for c in _nodes(body, ("call",)) if body is not None else []:
                 fn = c.child_by_field_name("function")
                 if fn is None:
                     continue
-                if _DB_CALL.search(_text(fn, src)):
+                if _DB_CALL.search(_text(fn, src)) or (item is not None and item.match(_text(fn, src))):
                     flags.add("query-in-loop")
                 elif fn.type == "identifier":
                     loop_calls.add(_text(fn, src))
@@ -606,6 +615,16 @@ def _js_kind(name: str, node) -> str:
     return "function"
 
 
+def _is_method(member) -> bool:
+    """A class member that is a function: `m() {}`, or a field holding one (`handle = () => {}`)."""
+    if member.type == "method_definition":
+        return True
+    if member.type in ("public_field_definition", "field_definition"):
+        value = member.child_by_field_name("value")
+        return value is not None and value.type in _JS_FUNC_VALUES
+    return False
+
+
 def _js_fn(node):
     """The function node that holds the parameters (for `const f = memo((p) => ...)` too)."""
     if node.child_by_field_name("parameters") is not None:
@@ -669,7 +688,7 @@ def _parse_js(path, src, lang):
         """The class itself: header, `extends`, fields. Methods are symbols of their own."""
         start = outer.start_byte
         head = src[start : body.start_byte if body is not None else node.end_byte].decode("utf8", "replace")
-        fields = [_text(m, src) for m in (body.named_children if body is not None else []) if m.type != "method_definition"]
+        fields = [_text(m, src) for m in (body.named_children if body is not None else []) if not _is_method(m)]
         source = head + "{" + ("\n  " + "\n  ".join(fields) + "\n" if fields else "") + "}"
         bases = re.findall(r"\bextends\s+([\w$.]+)", head)
         attrs: dict[str, str] = {}
@@ -685,7 +704,7 @@ def _parse_js(path, src, lang):
         class_attrs[cname] = attrs
         calls, direct = [], set()
         for m in body.named_children if body is not None else []:
-            if m.type != "method_definition":
+            if not _is_method(m):
                 c, _, d = _js_calls(m, src)
                 calls += c
                 direct |= d
@@ -736,8 +755,8 @@ def _parse_js(path, src, lang):
             body = stmt.child_by_field_name("body")
             add_js_class(cname, stmt, outer, body, exported)
             for m in body.named_children if body is not None else []:
-                if m.type == "method_definition":
-                    mn = m.child_by_field_name("name")
+                if _is_method(m):  # m() {} and handler = () => {} alike
+                    mn = m.child_by_field_name("name") or m.child_by_field_name("property")  # TS name / JS property
                     if mn is not None:
                         mname = _text(mn, src)
                         add(mname, f"{cname}.{mname}", m, m, exported, kind="method")

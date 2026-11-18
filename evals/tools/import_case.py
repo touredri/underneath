@@ -43,7 +43,7 @@ def git(repo: Path, *args: str) -> str:
 
 
 def show(repo: Path, rev: str, path: str) -> str | None:
-    r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=repo, capture_output=True, text=True)
+    r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=repo, capture_output=True, text=True, errors="replace")
     return r.stdout if r.returncode == 0 and len(r.stdout) <= MAX_FILE else None
 
 

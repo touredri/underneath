@@ -1,0 +1,5 @@
+{
+  "about": "A write per item of a query result is N+1: related-manager add, save() in a loop over a queryset",
+  "concepts": {"expected": ["py.queryInLoop"], "allowed": []},
+  "edges": {"expected": []}
+}
