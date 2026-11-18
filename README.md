@@ -35,9 +35,9 @@ In a randomized controlled trial, Anthropic found that developers learning a new
 - **Built for people who won't read.** 5 lines of text. At most 7 changed functions, 3 context functions and 5 concepts on the map. Everything else is one click away.
 - **Honest about what changed.** Code moved to another file, or pulled out of a big function, is marked *moved*, not new. Editing only a docstring is no change. Tests are not drawn: they become "tested by N" on the functions they call.
 - **Links you can trust.** `cache.get(k)` links to `ReportCache.get` when the code says `cache: ReportCache`; `rows.get(k)` on a dict links to nothing. Classes, `extends` and `super()` are followed; SQL written in Python or JS strings is read as SQL.
-- **Likely bugs surface by themselves.** Twelve rules are marked `risk`, each tied to the fundamental that explains it: `= NULL`, `NOT IN (SELECT …)`, an `UPDATE` without `WHERE`, a `WHERE` that undoes a `LEFT JOIN`; an effect without dependencies that sets state, an async effect, `key={index}`; `forEach(async …)`, an empty `catch`; an `except` that only passes, a query in a loop (N+1), a mutable default argument. They are always drawn, the agent must say whether each one is real or guarded, and the evaluation set counts false alarms as failures.
+- **Likely bugs surface by themselves, even one call away.** Twelve rules are marked `risk`, each tied to the fundamental that explains it: `= NULL`, `NOT IN (SELECT …)`, an `UPDATE` without `WHERE`, a `WHERE` that undoes a `LEFT JOIN`; an effect without dependencies that sets state, an async effect, `key={index}`; `forEach(async …)`, an empty `catch`; an `except` that only passes, a query in a loop (N+1), a mutable default argument. They are always drawn, the agent must say whether each one is real or guarded, and the evaluation set counts false alarms as failures.
 - **It remembers what you know.** A local registry counts the concepts you have seen. New ones get a thick border; familiar ones fade out. `/underneath gaps` lists the ones you never marked as known.
-- **Measured.** 76 diffs, 46 of them real commits of open-source projects, check that no concept is invented, no false link is drawn and no likely bug is raised for nothing (see [Evaluation](#evaluation)).
+- **Measured.** 101 diffs, 66 of them real commits of open-source projects, check that no concept is invented, no false link is drawn and no likely bug is raised for nothing (see [Evaluation](#evaluation)).
 - **Local.** No network, no telemetry. `.underneath/` ignores itself in git.
 
 ![The fundamental panel for a SQL change, dark mode](docs/map-sql-dark.png)
@@ -85,7 +85,7 @@ Work as usual. At the end of a task the agent runs the skill and shows the card.
 - `/underneath since main`: map everything since `main`
 - `/underneath map`: the whole project's concept skeleton
 - `/underneath gaps`: concepts in your code you never marked as known
-- `/underneath log`: what the cards of the last 7 days showed (`--days N` for another period)
+- `/underneath log`: what the cards of the last 7 days showed, compared with the 7 days before, and what you marked known (`--days N` for another period)
 - `/underneath deeper closures`: the fundamental, with a minimal example
 - `/underneath known react.useState`: stop highlighting a concept you know
 
@@ -138,10 +138,10 @@ open /tmp/demo/latest.html
 `.underneath/config.json` is optional:
 
 ```json
-{ "language": "fr", "stop_hook": false, "stop_hook_timeout": 20, "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 } }
+{ "language": "fr", "stop_hook": false, "stop_hook_timeout": 20, "graphify": false, "limits": { "changed": 7, "context": 3, "concepts": 5, "min_lines": 8 } }
 ```
 
-`language` sets the language of the agent's notes, `stop_hook` turns the plugin's hook off, `stop_hook_timeout` is how long it waits for `extract`, `limits` changes the map budgets.
+`language` sets the language of the agent's notes, `stop_hook` turns the plugin's hook off, `stop_hook_timeout` is how long it waits for `extract`, `graphify` ignores a Graphify graph, `limits` changes the map budgets.
 
 ## How it works
 
@@ -170,18 +170,22 @@ On a 2,000-file React + Python repository, a diff takes 1.5 to 4 seconds; the pr
 - **edge recall** and **false links**: expected calls found, and edges that should not be there;
 - **wrong context**: an unchanged function drawn when it should not be (a utility used everywhere), or missing when it should be (a caller).
 
-76 cases. 30 written for the purpose: the examples, a few changes per stack, each likely bug next to its safe version, and traps such as a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` used in every page. 46 real commits of [zustand](https://github.com/pmndrs/zustand), [httpx](https://github.com/encode/httpx), [postgres_dba](https://github.com/NikolayS/postgres_dba), [jaffle-shop-classic](https://github.com/dbt-labs/jaffle-shop-classic), [bulletproof-react](https://github.com/alan2207/bulletproof-react), [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) and [djangoproject.com](https://github.com/django/djangoproject.com), annotated by reading the diff before running the tool (licenses in `evals/third_party/`).
+101 cases. 35 written for the purpose: the examples, a few changes per stack, each likely bug next to its safe version, and traps such as a docstring that says "await", `IS NOT NULL`, a variable named `signal`, `dict.get` next to a class with a `get` method, `cn` used in every page, a loop calling a helper that does not query. 66 real commits of [zustand](https://github.com/pmndrs/zustand), [httpx](https://github.com/encode/httpx), [postgres_dba](https://github.com/NikolayS/postgres_dba), [jaffle-shop-classic](https://github.com/dbt-labs/jaffle-shop-classic), [bulletproof-react](https://github.com/alan2207/bulletproof-react), [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template), [djangoproject.com](https://github.com/django/djangoproject.com), [excalidraw](https://github.com/excalidraw/excalidraw), [healthchecks](https://github.com/healthchecks/healthchecks), [netbox](https://github.com/netbox-community/netbox), [redash](https://github.com/getredash/redash), [saleor](https://github.com/saleor/saleor) and [zulip](https://github.com/zulip/zulip), annotated by reading the diff before running the tool (licenses in `evals/third_party/`).
 
-| On the same 76 cases | v0.3.0 | v0.4.0 |
+| On the same 101 cases | v0.4.0 | v0.5.0 |
 |---|---|---|
-| Concept precision | 99.0% (2 invented) | 100% (0 invented) |
-| Concept recall | 94.5% | 100% |
-| Edge recall | 95.2% | 98.6% |
-| False links | 3 | 0 |
-| Likely-bug rules | 2 | 12 |
-| Likely bugs found / false alarms | | 100% / 0 |
+| Concept precision | 100% (0 invented) | 100% (0 invented) |
+| Concept recall | 95.8% | 99.6% |
+| Edge recall | 97.0% | 98.7% |
+| False links | 0 | 0 |
+| Likely bugs found | 64.0% | 96.0% |
+| False alarms | 0 | 0 |
 
-The two links still missed need Django's runtime (`self.model`, a loop over `Model.__subclasses__()`). Each version is measured on cases that exposed its predecessor's mistakes, so read 100% as "fixed what this set exposed": the set keeps growing. To add a commit: `python3 evals/tools/import_case.py <repo> <sha> <name>`, fill `expected.json` from the diff, then `python3 evals/run.py --show <name>` prints what the tool sees.
+Still missed: an N+1 that comes from a lazy foreign-key attribute (`check.project.owner`, no call to see), and links that need Django's runtime (`self.model`) or an `isinstance()` check. Each version is measured on cases that exposed its predecessor's mistakes, so read the numbers as "fixed what this set exposed": the set keeps growing. To add a commit: `python3 evals/tools/import_case.py <repo> <sha> <name>`, fill `expected.json` from the diff, then `python3 evals/run.py --show <name>` prints what the tool sees.
+
+### With Graphify
+
+If you use [Graphify](https://github.com/Graphify-Labs/graphify), underneath reads its `graphify-out/graph.json` when it finds one in the repository or up to two folders above (a workspace holding several repositories). Callers of the changed functions that its own scan cannot see, such as code in another repository, then appear as context, marked "via graphify". Only edges Graphify read from a syntax tree (`EXTRACTED`) are used. `{"graphify": false}` in `.underneath/config.json` turns it off.
 
 ## Add a stack
 
@@ -205,18 +209,16 @@ Then add a case under `evals/cases/` (or an example under `examples/` with a tes
 
 Stacks we would love to see: Vue, Svelte, Next.js server components, Django ORM, FastAPI, Go, Rust, Kotlin, Flutter.
 
-## Limits (v0.4)
+## Limits (v0.5)
 
 - A method call is linked through its receiver's type only when the code states the type (annotation, constructor, attribute set from one of those). Otherwise it falls back to the name, with same-class, same-file and import hints; built-in method names (`get`, `push`, `map`…) and calls on a chain (`self.x.m()`) are then not linked at all.
 - Nested functions are folded into their parent. TypeScript interfaces and types are not nodes.
 - SQL in strings is read only when passed to a known sink or written in uppercase SQL; SQL assembled from pieces is not.
-- Likely-bug rules look at one function at a time: a query in a loop is seen when both are in the same function, not when the loop calls a helper that queries.
+- Likely-bug rules look one call away at most, through links read from the code: a loop that calls a helper that calls another helper that queries is not seen. An N+1 caused by a lazy attribute (`order.customer.name` loading a row) has no call to see.
 - Concept rules are pattern-based. The evaluation set keeps them honest, but it is small.
-- The map is regenerated each time. There is no history yet.
 
 ## Roadmap
 
-- **v0.5**: optional reading of a [Graphify](https://github.com/Graphify-Labs/graphify) `graph.json` for callers outside the repo scan; more real commits in the evaluation set.
 - **v0.6**: more stacks (Vue, Django ORM, Go).
 - **v1.0**: team mode, with a shared project registry as living onboarding documentation.
 

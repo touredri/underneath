@@ -2,6 +2,26 @@
 
 All notable changes to underneath. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-18
+
+### Added
+
+- Likely bugs one call away, through extracted links only: a loop calling a project function that queries is N+1, `forEach(save)` with an async `save` does not wait, an effect without dependencies calling a function of the same component that sets state loops. The brief names the function that makes it true.
+- N+1 writes: a loop over a query result (`objects…`, `.iterator()`, `.all()`, `.filter()`…) that saves, deletes or adds to a relation of each item. Django's `SessionStore` counts as the database.
+- Optional Graphify: when `graphify-out/graph.json` exists in the repository or up to two folders above, its EXTRACTED `calls` edges add callers the scan cannot see, such as code in another repository of the workspace. `"graphify": false` turns it off.
+- `extract` caches parsed symbols in `.underneath/cache/symbols.json` (JSON, never pickle): a warm run on a 2,000-file repository takes 1.9 s instead of 3.2 s.
+- `underneath log` compares the period with the one before and lists the concepts marked known in it; `known` records the date.
+- 23 evaluation cases: 20 real commits of excalidraw, healthchecks, netbox, redash, saleor and zulip, and cases for each new rule next to its trap. 101 cases in all.
+
+### Changed
+
+- `py.comprehension` is read from the syntax tree (list, set, dict and generator expressions).
+- A class field holding a function (`handler = () => {}`) is a method.
+
+### Fixed
+
+- `import_case.py` failed on non-UTF-8 files of old commits.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added
@@ -92,6 +112,7 @@ All notable changes to underneath. The format follows [Keep a Changelog](https:/
 
 - First release: `extract`, `render`, `deeper`, `known`. A 5-line card and an HTML map of the functions an agent changed, how they connect, the concepts they use and the fundamental underneath, for React/TypeScript/JavaScript, Python and SQL.
 
+[0.5.0]: https://github.com/touredri/underneath/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/touredri/underneath/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/touredri/underneath/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/touredri/underneath/compare/v0.2.0...v0.2.1

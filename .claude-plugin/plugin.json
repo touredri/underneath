@@ -1,6 +1,6 @@
 {
   "name": "underneath",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "See what the AI just wrote, and what it rests on: a 5-line card and a map of the functions an agent changed, how they connect, the concepts they use and the language fundamental underneath. A Stop hook shows it at the end of every task that changed code.",
   "author": { "name": "Drissa Toure" },
   "license": "MIT",

@@ -37,11 +37,12 @@ scripts/project.py            whole-project scan with per-file cache (map, gaps)
 scripts/render_map.py         map/gaps cards and map.html
 scripts/stop_hook.py          the Stop hook; scripts/ids.py: change_id shared with render
 scripts/history.py            .underneath/history.jsonl and `underneath log`
+scripts/graphify_link.py      optional callers from a Graphify graphify-out/graph.json
 references/stacks/*.md        concept catalogues (the contribution unit)
 references/fundamentals.md    fundamentals with a short example each
 references/card-format.md     notes.json schema, writing rules, config.json keys
 examples/*/before|after       fixtures, each with the notes.json an agent would write
-evals/                        cases/*/expected.json (24 synthetic, 24 real-*), run.py, thresholds.json,
+evals/                        cases/*/expected.json (35 synthetic, 66 real-*), run.py, thresholds.json,
                               tools/import_case.py (commit -> case), third_party/ (licenses of real cases)
 tests/test_examples.py        end-to-end tests (includes the evals)
 .github/workflows/ci.yml      tests + evals on Linux (3.10, 3.13) and macOS
@@ -62,15 +63,15 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.4.0 (2026-11-16), see CHANGELOG.md. Twelve likely-bug rules (`detect: tree <flag>` for structural ones), calls classified by receiver (bare, self, module, local, chain, fluent), Django tests and managers, Stop hook that follows the code with a timeout. 19 tests and 76 eval cases (46 real commits): 100 % precision and recall, 98.6 % edge recall, 0 false links, 0 false alarms. Published at https://github.com/touredri/underneath: tag and release v0.4.0, CI green, installed plugin updated. Real cases are redacted on import (GitHub push protection once refused a public Stripe test key copied from djangoproject.com).
+v0.5.0 (2026-11-18), see CHANGELOG.md. Likely bugs one call away (N+1 through a helper, forEach with an async function, effect calling a local setter), N+1 ORM writes per item of a queryset, optional Graphify callers, a JSON symbol cache for extract, trends in `log`. 22 tests and 101 eval cases (66 real commits): 100 % precision, 99.6 % recall, 98.7 % edge recall, 0 false links, likely bugs 96 % found with 0 false alarms. v0.4.0 is published; 0.5.0 is committed locally and waits for the maintainer's go to push and release.
 
-Known limits: types only when stated; likely-bug rules see one function at a time (a loop that calls a helper which queries is not N+1 to them); nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL.
+Known limits: types only when stated; likely bugs one call away at most, lazy-attribute N+1 invisible; nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL.
 
 ## Next steps (in order)
 
-1. Grow the real-commit eval set (more repos, React apps, FastAPI/Django with SQL in strings) with evals/tools/import_case.py; keep expectations written from the diff.
-2. v0.5: optional Graphify `graph.json` for callers outside the scan.
-3. v0.6: more stacks (Vue, Django, Go).
+1. Push 0.5.0, tag, GitHub release, CI, `/plugin update`.
+2. Grow the real-commit eval set with evals/tools/import_case.py; keep expectations written from the diff.
+3. v0.6: more stacks (Vue, Django ORM, Go).
 
 ## Conventions
 
