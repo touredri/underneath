@@ -63,15 +63,14 @@ Inside a real git repo: `python3 <this folder>/scripts/underneath.py extract`, w
 
 ## Status
 
-v0.5.0 (2026-11-18), see CHANGELOG.md. Likely bugs one call away (N+1 through a helper, forEach with an async function, effect calling a local setter), N+1 ORM writes per item of a queryset, optional Graphify callers, a JSON symbol cache for extract, trends in `log`. 21 tests and 101 eval cases (66 real commits): 100 % precision, 99.6 % recall, 98.7 % edge recall, 0 false links, likely bugs 96 % found with 0 false alarms. v0.4.0 is published; 0.5.0 is committed locally and waits for the maintainer's go to push and release.
+v0.5.0 (2026-11-18), see CHANGELOG.md. Likely bugs one call away (N+1 through a helper, forEach with an async function, effect calling a local setter), N+1 ORM writes per item of a queryset, optional Graphify callers, a JSON symbol cache for extract, trends in `log`. 21 tests and 101 eval cases (66 real commits): 100 % precision, 99.6 % recall, 98.7 % edge recall, 0 false links, likely bugs 96 % found with 0 false alarms. Published at https://github.com/touredri/underneath: tag and release v0.5.0, CI green, installed plugin updated.
 
 Known limits: types only when stated; likely bugs one call away at most, lazy-attribute N+1 invisible; nested functions folded; TS interfaces/types not nodes; SQL in strings only via sinks or uppercase SQL.
 
 ## Next steps (in order)
 
-1. Push 0.5.0, tag, GitHub release, CI, `/plugin update`.
-2. Grow the real-commit eval set with evals/tools/import_case.py; keep expectations written from the diff.
-3. v0.6: more stacks (Vue, Django ORM, Go).
+1. Grow the real-commit eval set with evals/tools/import_case.py; keep expectations written from the diff.
+2. v0.6: more stacks (Vue, Django ORM, Go).
 
 ## Conventions
 
