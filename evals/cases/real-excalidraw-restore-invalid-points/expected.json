@@ -1,0 +1,25 @@
+{
+  "about": "excalidraw 0457ac90: restore drops invalid points; new restoreLinearElementPoints and restoreFreedrawPoints (packages/excalidraw) validate each point with the new isValidPoint of packages/math, imported through @excalidraw/math; restoreElement uses them for lines, arrows and freedraw (calls across packages)",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["restoreLinearElementPoints", "isValidPoint", "calls"],
+      ["restoreFreedrawPoints", "isValidPoint", "calls"],
+      ["restoreLinearElementPoints", "pointFrom", "calls"],
+      ["restoreFreedrawPoints", "pointFrom", "calls"],
+      ["restoreLinearElementPoints", "isFiniteNumber", "calls"],
+      ["restoreFreedrawPoints", "isFiniteNumber", "calls"],
+      ["isValidPoint", "isFiniteNumber", "calls"],
+      ["restoreElement", "restoreLinearElementPoints", "calls"],
+      ["restoreElement", "restoreFreedrawPoints", "calls"],
+      ["restoreElement", "restoreElementWithProperties", "calls"],
+      ["restoreElement", "repairBinding", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

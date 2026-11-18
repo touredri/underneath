@@ -1,0 +1,21 @@
+{
+  "about": "healthchecks abe0b289: senddeletionnotices skips accounts whose projects have recently active members; the per-profile loop in Command.handle now calls has_projects_with_active_members, which runs a Member query (one query per profile through one call, next to the direct Ping query)",
+  "concepts": {
+    "expected": [
+      "py.queryInLoop",
+      "py.varargs"
+    ],
+    "allowed": [
+      "py.inheritance"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["Command.handle", "has_projects_with_active_members", "calls"],
+      ["Command.handle", "Command.pause", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

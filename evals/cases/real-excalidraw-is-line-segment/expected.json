@@ -1,0 +1,15 @@
+{
+  "about": "excalidraw 1c292e49: the isLineSegment type guard in packages/math checked the first point twice; it now checks segment[1] with isPoint from point.ts",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["isLineSegment", "isPoint", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "about": "excalidraw 37ad85cb: StaticCanvas sizes its canvas in a separate effect with dependencies; the render effect keeps no dependency array but only calls project renderers (renderStaticScene, isRenderThrottlingEnabled), never a state setter (trap for effects without deps)",
+  "concepts": {
+    "expected": [
+      "react.useEffect",
+      "react.useRef"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["StaticCanvas", "renderStaticScene", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "about": "healthchecks c41796e4: new sendflappingnotices command (hc.accounts) emails owners of checks with over 200 flips in 24 hours through the new hc.lib.emails.flapping_notice; the loop reads check.project.owner.email on a queryset fetched with .only('name') and no select_related, so it lazily loads the project and the owner for every check (a query in a loop with no explicit query call), while the email helper it calls runs no query",
+  "concepts": {
+    "expected": [
+      "py.inheritance",
+      "py.varargs",
+      "py.queryInLoop"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["Command.handle", "flapping_notice", "calls"],
+      ["Command.handle", "Command.pause", "calls"],
+      ["flapping_notice", "make_message", "calls"],
+      ["flapping_notice", "send", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

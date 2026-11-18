@@ -1,0 +1,63 @@
+{
+  "about": "saleor 0179b331b: the product search-vector task loads referenced page titles once per batch (three queries per batch of 100) and passes page_id_to_title_map down through prepare_product_search_vector_value, generate_attributes_search_vector_value and get_search_vectors_for_values, so get_reference_attribute_search_value no longer loads reference_page per value",
+  "concepts": {
+    "expected": [
+      "py.comprehension"
+    ],
+    "allowed": [
+      "py.queryInLoop"
+    ]
+  },
+  "edges": {
+    "expected": [
+      [
+        "update_products_search_vector",
+        "queryset_in_batches",
+        "calls"
+      ],
+      [
+        "update_products_search_vector",
+        "_prep_product_search_vector_index",
+        "calls"
+      ],
+      [
+        "_prep_product_search_vector_index",
+        "prepare_product_search_vector_value",
+        "calls"
+      ],
+      [
+        "prepare_product_search_vector_value",
+        "generate_attributes_search_vector_value",
+        "calls"
+      ],
+      [
+        "prepare_product_search_vector_value",
+        "generate_variants_search_vector_value",
+        "calls"
+      ],
+      [
+        "generate_attributes_search_vector_value",
+        "get_search_vectors_for_values",
+        "calls"
+      ],
+      [
+        "get_search_vectors_for_values",
+        "get_reference_attribute_search_value",
+        "calls"
+      ],
+      [
+        "get_search_vectors_for_values",
+        "clean_editor_js",
+        "calls"
+      ],
+      [
+        "update_products_search_vector_task",
+        "update_products_search_vector",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

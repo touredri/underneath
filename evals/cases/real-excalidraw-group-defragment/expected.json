@@ -1,0 +1,20 @@
+{
+  "about": "excalidraw 3f5fdec0: group defragmenting is rewritten; defragmentGroups replaces normalizeGroupElementOrder with a level-by-level bucketing that recurses into nested groups, normalizeBoundElementsOrder becomes a plain for...of loop, and normalizeElementOrder (called by duplicateElements) chains them; duplicateElements only gains a comment",
+  "concepts": {
+    "expected": [],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["normalizeElementOrder", "defragmentGroups", "calls"],
+      ["normalizeElementOrder", "normalizeBoundElementsOrder", "calls"],
+      ["duplicateElements", "normalizeElementOrder", "calls"]
+    ],
+    "forbidden": [
+      ["normalizeElementOrder", "normalizeGroupElementOrder", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

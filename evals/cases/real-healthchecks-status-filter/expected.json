@@ -1,0 +1,24 @@
+{
+  "about": "healthchecks 7c8d4341: the checks view filters by status on the server; a loop over the already fetched checks calls the new _status_match, which only reads fields through Check.get_status (no query: trap for a query in a loop through one call)",
+  "concepts": {
+    "expected": [
+      "py.decorator",
+      "py.lambda"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["checks", "_status_match", "calls"],
+      ["_status_match", "Check.get_status", "calls"],
+      ["checks", "_refresh_last_active_date", "calls"],
+      ["checks", "_get_project_for_user", "calls"],
+      ["checks", "_tags_counts", "calls"],
+      ["checks", "_common_timezones", "calls"],
+      ["checks", "sortchecks", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "about": "netbox 59759f36b: CustomFieldListSerializer.to_representation groups object custom-field targets by model, then per model loads them and prefetches what their brief serializer needs, using get_serializer_for_model and get_prefetches_for_serializer from the utilities app (calls across apps; one query per target model, deliberate batching)",
+  "concepts": {
+    "expected": [
+      "py.comprehension"
+    ],
+    "allowed": [
+      "py.queryInLoop"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["CustomFieldListSerializer.to_representation", "get_serializer_for_model", "calls"],
+      ["CustomFieldListSerializer.to_representation", "get_prefetches_for_serializer", "calls"],
+      ["CustomFieldListSerializer.to_representation", "CustomFieldsDataField._get_custom_fields", "calls"]
+    ],
+    "forbidden": [
+      ["CustomFieldListSerializer.to_representation", "CustomFieldsDataField.to_representation", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

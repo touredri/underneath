@@ -1,0 +1,18 @@
+{
+  "about": "saleor 4cb1609a9: giftCardBulkCreate adds the new cards to each existing tag instead of replacing the tag's cards (gift_cards.set -> gift_cards.add); the loop over tags still runs one many-to-many insert per tag (query in a loop through a related manager, not .objects)",
+  "concepts": {
+    "expected": [
+      "py.comprehension",
+      "py.queryInLoop"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["GiftCardBulkCreate.perform_mutation", "GiftCardBulkCreate.assign_gift_card_tags", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

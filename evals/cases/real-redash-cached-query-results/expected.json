@@ -1,0 +1,32 @@
+{
+  "about": "redash 1867ea50: the Query Results data source can read cached_query_<id> tables; get_query_results loads a query (from its cached result or by running it) and create_tables_from_query_ids loops over both id lists calling it, with a [] default for the new cached_query_ids parameter",
+  "concepts": {
+    "expected": [
+      "py.mutableDefault",
+      "py.exceptions",
+      "py.comprehension"
+    ],
+    "allowed": [
+      "py.queryInLoop"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["Results.run_query", "extract_query_ids", "calls"],
+      ["Results.run_query", "extract_cached_query_ids", "calls"],
+      ["Results.run_query", "create_tables_from_query_ids", "calls"],
+      ["Results.run_query", "_guess_type", "calls"],
+      ["Results.run_query", "BaseQueryRunner.fetch_columns", "calls"],
+      ["create_tables_from_query_ids", "get_query_results", "calls"],
+      ["create_tables_from_query_ids", "create_table", "calls"],
+      ["get_query_results", "_load_query", "calls"]
+    ],
+    "forbidden": [
+      ["get_query_results", "Results.run_query", "calls"],
+      ["get_query_results", "BaseQueryRunner.run_query", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

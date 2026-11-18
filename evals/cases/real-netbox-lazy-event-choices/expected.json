@@ -1,0 +1,23 @@
+{
+  "about": "netbox 75e0432c9: event rule forms resolve event type choices lazily; EventRuleBulkEditForm and EventRuleForm pass the function get_event_type_choices (netbox app) as choices instead of calling it at import time, and EventRuleImportForm calls it in a new __init__ (calls across apps; passing the function is not a call)",
+  "concepts": {
+    "expected": [
+      "py.inheritance",
+      "py.varargs"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["EventRuleImportForm.__init__", "get_event_type_choices", "calls"]
+    ],
+    "forbidden": [
+      ["EventRuleBulkEditForm", "get_event_type_choices", "calls"],
+      ["EventRuleForm", "get_event_type_choices", "calls"],
+      ["EventRuleImportForm", "get_event_type_choices", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

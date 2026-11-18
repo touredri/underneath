@@ -1,0 +1,22 @@
+{
+  "about": "excalidraw 757dfeb6: throttleRAF in packages/common drops its trailing option and always runs with the latest args; the throttled renderers in packages/excalidraw and excalidraw-app (imported through @excalidraw/common) stop passing { trailing: true } (calls across packages of the monorepo)",
+  "concepts": {
+    "expected": [],
+    "allowed": [
+      "web.timers"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["renderStaticSceneThrottled", "throttleRAF", "calls"],
+      ["renderNewElementSceneThrottled", "throttleRAF", "calls"],
+      ["debugRenderer", "throttleRAF", "calls"],
+      ["renderStaticSceneThrottled", "_renderStaticScene", "calls"],
+      ["renderNewElementSceneThrottled", "_renderNewElementScene", "calls"],
+      ["debugRenderer", "_debugRenderer", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

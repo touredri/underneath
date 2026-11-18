@@ -1,0 +1,34 @@
+{
+  "about": "redash ea589ad4: the items list no longer runs two searches at once; the wrapper built by wrap() replaces debounce(updateSearch) with a debounced async callback that awaits updateSearch and replays the latest pending params, and ItemsSource.updateSearch now returns the promise of _changed",
+  "concepts": {
+    "expected": [
+      "js.asyncAwait",
+      "js.class",
+      "js.inheritance",
+      "web.timers"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "ItemsSource.updateSearch",
+        "ItemsSource._changed",
+        "calls"
+      ],
+      [
+        "ItemsSource.updateSearch",
+        "Sorter.setField",
+        "calls"
+      ],
+      [
+        "ItemsSource.updateSearch",
+        "Paginator.setPage",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

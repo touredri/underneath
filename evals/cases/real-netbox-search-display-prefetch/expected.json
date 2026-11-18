@@ -1,0 +1,21 @@
+{
+  "about": "netbox 18f38d112: global search prefetches display attributes again; in CachedValueSearchBackend.search the per-object-type loop now matches results by object_type_id instead of comparing ObjectType instances, then prefetches those objects (prefetch per type, and the comprehension re-iterates the raw queryset each time); an IP-parse failure is deliberately ignored with pass",
+  "concepts": {
+    "expected": [
+      "py.comprehension",
+      "py.exceptions"
+    ],
+    "allowed": [
+      "py.queryInLoop",
+      "py.swallowedException"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["CachedValueSearchBackend.search", "object_type_identifier", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

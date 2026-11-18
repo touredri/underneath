@@ -1,0 +1,22 @@
+{
+  "about": "saleor 80a49cfce: the user search-vector backfill task (a celery task that re-queues itself with .delay) keeps a last_user_pk cursor so each batch skips processed rows, runs on the data-migrations queue, and still writes through set_search_vector_values inside allow_writer(); generate_user_search_vector_value is passed as a value, not called",
+  "concepts": {
+    "expected": [
+      "py.decorator",
+      "py.contextManager"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      ["set_user_search_document_values", "set_search_vector_values", "calls"],
+      ["set_user_search_document_values", "allow_writer", "calls"]
+    ],
+    "forbidden": [
+      ["set_user_search_document_values", "generate_user_search_vector_value", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

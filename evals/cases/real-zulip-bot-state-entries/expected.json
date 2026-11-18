@@ -1,0 +1,32 @@
+{
+  "about": "zulip d2af8d4cbd6: set_bot_state takes a list of entries; its first loop sums the size change by calling get_bot_state_size, which queries BotUserStateData, once per entry, and its second loop runs one update_or_create per entry; remove_bot_state deletes a list of keys in one query; StateHandler passes one-entry lists (put also keeps a stale call with the old signature)",
+  "concepts": {
+    "expected": [
+      "py.queryInLoop",
+      "py.exceptions"
+    ],
+    "allowed": []
+  },
+  "edges": {
+    "expected": [
+      [
+        "set_bot_state",
+        "get_bot_state_size",
+        "calls"
+      ],
+      [
+        "StateHandler.put",
+        "set_bot_state",
+        "calls"
+      ],
+      [
+        "StateHandler.remove",
+        "remove_bot_state",
+        "calls"
+      ]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}

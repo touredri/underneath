@@ -1,0 +1,23 @@
+{
+  "about": "zulip e95f972e24: new zerver.lib.migrate.do_batch_update runs a SQL UPDATE over id ranges with a cursor (MIN/MAX first, one UPDATE per batch, sleeping between batches); the pgroonga migration (another app) now calls it instead of building IN lists; the linter's build_custom_checkers only gains an exclude entry, and its nested checkers loop over files calling custom_check_file, which reads files and runs no query (trap)",
+  "concepts": {
+    "expected": [
+      "py.contextManager",
+      "sql.aggregation",
+      "py.closure"
+    ],
+    "allowed": [
+      "py.queryInLoop",
+      "py.comprehension"
+    ]
+  },
+  "edges": {
+    "expected": [
+      ["rebuild_pgroonga_index", "do_batch_update", "calls"],
+      ["build_custom_checkers", "custom_check_file", "calls"]
+    ]
+  },
+  "limits": {
+    "context": 20
+  }
+}
